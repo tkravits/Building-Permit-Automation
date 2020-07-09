@@ -1,0 +1,295 @@
+import pandas as pd
+import pyodbc
+import numpy as np
+import glob
+import csv
+import time
+
+# sets the display so that when the code prints, it is readable
+pd.set_option('display.max_rows', 1500)
+pd.set_option('display.max_columns', 50)
+pd.set_option('display.width', 1500)
+
+# set the time for exported excel spreadsheets
+CurrentDate = pd.Timestamp.today()
+SetDate = (CurrentDate - pd.DateOffset(months=1)).strftime("%B%Y")
+
+# imports the permit sheet to be cleaned up
+for filename in glob.glob(r'C:\ExcelPermits\NeedToDo' + "/*.xlsx"):
+    df = pd.read_excel(filename)
+
+# removes Information permits in both the Permit Type and Work Class fields, also removes any parcel number that starts
+# with BLK, INT, or null. These are usually involved in right-of-ways and are not needed for valuation
+# Also drops permits with no parcel number or address, usually right-of-way permits
+
+df = df[~df['Parcel Number'].str.contains('BLK', na=False)]
+df = df[~df['Parcel Number'].str.contains('INT', na=False)]
+df.dropna(subset=['Parcel Number', 'Address'])
+df_review = df[df['Status'].str.contains('In Review')]
+df = df[~df['Work Class'].str.contains('Information')]
+df_review.to_excel("Permits_In_Review_" + SetDate + '.xlsx')
+
+# removes Pending, Void, In Review, Withdrawn, Approved for permits in the Status. We only want permits that
+# either have been issued or are already completed since permit value and other areas can change.
+df = df[~df['Status'].str.contains('Pending')]
+df = df[~df['Status'].str.contains('Void')]
+df = df[~df['Status'].str.contains('In Review')]
+df = df[~df['Status'].str.contains('Withdrawn')]
+df = df[~df['Status'].str.contains('Approved for')]
+
+# removes * and carriage returns
+df['Description'].replace(regex=True, inplace=True, to_replace=r'\*', value=r'')
+df['Description'].replace(regex=True, inplace=True, to_replace=r'\n', value=r'')
+df['Description'].replace(regex=True, inplace=True, to_replace=r'\r', value=r'')
+
+# creates a column named Value Total, sets it to 0, and sums values that the City divides up into different categories
+df['Value Total'] = '0'
+df['Value Total'] = df.iloc[:, 14:29].sum(axis=1)
+cols = [1, 9, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+
+# removes the different valuation category columns the City provides
+df.drop(df.columns[cols], axis=1, inplace=True)
+
+calc_value = df['Calculated Valuation']
+updated_calc = df['Value Total'] == 0
+df.loc[updated_calc, 'Value Total'] = calc_value
+df.drop(df.columns[10], axis=1, inplace=True)
+df['Value Total'] = df['Value Total'].fillna(0)
+df['Description'] = df['Description'].fillna('No Description')
+df['Value Total'] = df['Value Total'].astype('int')
+df['SCOPE'] = 'N/A'
+
+# The SCOPE column is what CAMA uses to classify each permit with a unique ID (ex. RRR is residential roofing), this is
+# taking key words from either the Work Class column or the Description column and assigning a specific three letter
+# code to be used in the upload process. This is also set up so that if a description can be found multiple times it is
+# overwritten by more important codes (ie: OTH is lower, and remodels (REM) are more important and therefore listed
+# towards the end of these)
+
+df.loc[df['Work Class'].str.contains('Temporary', case=False), 'SCOPE'] = 'ELM'
+df.loc[df['Work Class'].str.contains('Construction', case=False), 'SCOPE'] = 'OTH'
+df.loc[df['Description'].str.contains('RTU', case=False), 'SCOPE'] = 'HTG'
+df.loc[df['Description'].str.contains('RTUs', case=False), 'SCOPE'] = 'HTG'
+df.loc[df['Work Class'].str.contains('Mechanical'), 'SCOPE'] = 'ELM'
+df.loc[df['Work Class'].str.contains('Electrical', case=False), 'SCOPE'] = 'ELM'
+df.loc[df['Work Class'].str.contains('Grading'), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Groundwater'), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Erosion'), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Roofing'), 'SCOPE'] = 'RRR'
+df.loc[df['Description'].str.contains('heat', case=False), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Non-Public'), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Public'), 'SCOPE'] = 'OTH'
+df.loc[df['Description'].str.contains('boiler', case=False), 'SCOPE'] = 'OTH'
+df.loc[df['Description'].str.contains('ductless', case=False), 'SCOPE'] = 'HTG'
+df.loc[df['Description'].str.contains('furnace', case=False), 'SCOPE'] = 'HTG'
+df.loc[df['Description'].str.contains('heater', case=False), 'SCOPE'] = 'OTH'
+df.loc[df['Description'].str.contains('PV', case=False), 'SCOPE'] = 'ENR'
+df.loc[df['Description'].str.contains('solar', case=False), 'SCOPE'] = 'ENR'
+df.loc[df['Description'].str.contains('photo', case=False), 'SCOPE'] = 'ENR'
+df.loc[df['Description'].str.contains('P.V.', case=False), 'SCOPE'] = 'ENR'
+df.loc[df['Description'].str.contains('photovoltaic', case=False), 'SCOPE'] = 'ENR'
+df.loc[df['Description'].str.contains('geotherm', case=False), 'SCOPE'] = 'ENR'
+df.loc[df['Description'].str.contains('flush-mounted', case=False), 'SCOPE'] = 'ENR'
+df.loc[(df['Work Class'].str.contains('Mechanical')) & (df['Description'].str.contains('gas fireplace', case=False)), 'SCOPE'] = 'GFP'
+df.loc[(df['Work Class'].str.contains('Mechanical')) & (df['Description'].str.contains('existing wood-burning', case=False)), 'SCOPE'] = 'GFP'
+df.loc[df['Work Class'].str.contains('Repair'), 'SCOPE'] = 'GRP'
+df.loc[(df['Work Class'].str.contains('Repair')) & (df['Description'].str.contains('foundation', case=False)), 'SCOPE'] = 'SRP'
+df.loc[(df['Work Class'].str.contains('Repair')) & (df['Description'].str.contains('structural', case=False)), 'SCOPE'] = 'SRP'
+df.loc[(df['Work Class'].str.contains('Repair')) & (df['Description'].str.contains('fire', case=False)), 'SCOPE'] = 'FRP'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (df['Description'].str.contains('gas fireplace', case=False)), 'SCOPE'] = 'GFP'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (df['Description'].str.contains('mini-split', case=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (df['Description'].str.contains('mini split', case=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (df['Description'].str.contains('condenser', case=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (df['Description'].str.contains('air condition', case=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (df['Description'].str.contains('a/c', case=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (df['Description'].str.contains(' ac ', case=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (df['Description'].str.contains(' ac', case=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (df['Description'].str.contains(' a/c ', case=False)), 'SCOPE'] = 'AIR'
+df.loc[df['Work Class'].str.contains('Mechanical Sub-'), 'SCOPE'] = 'ELM'
+df.loc[df['Work Class'].str.contains('Plumbing'), 'SCOPE'] = 'ELM'
+df.loc[df['Work Class'].str.contains('Electrical Sub-'), 'SCOPE'] = 'ELM'
+df.loc[df['Work Class'].str.contains('Utility'), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Siding'), 'SCOPE'] = 'SDG'
+df.loc[df['Work Class'].str.contains('Right'), 'SCOPE'] = 'OTH'
+df.loc[(df['Work Class'].str.contains('Right')) & (df['Description'].str.contains('sewer', case=False)), 'SCOPE'] = 'RWSRPR'
+df.loc[df['Work Class'].str.contains('Fence'), 'SCOPE'] = 'FEN'
+df.loc[df['Work Class'].str.contains('Tenant'), 'SCOPE'] = 'TFN'
+df.loc[df['Work Class'].str.contains('Remodel'), 'SCOPE'] = 'REM'
+df.loc[(df['Work Class'].str.contains('Remodel')) & (df['Description'].str.contains('finished basement', case=False)), 'SCOPE'] = 'BFN'
+df.loc[(df['Work Class'].str.contains('Remodel')) & (df['Description'].str.contains('basement finish', case=False)), 'SCOPE'] = 'BFN'
+df.loc[(df['Work Class'].str.contains('Remodel')) & (df['Description'].str.contains('basement remodel', case=False)), 'SCOPE'] = 'BFN'
+df.loc[(df['Work Class'].str.contains('Remodel')) & (df['Description'].str.contains('bathroom remodel', case=False)), 'SCOPE'] = 'BTH'
+df.loc[(df['Work Class'].str.contains('Remodel')) & (df['Description'].str.contains('bath remodel', case=False)), 'SCOPE'] = 'BTH'
+df.loc[(df['Work Class'].str.contains('Remodel')) & (df['Description'].str.contains('tenant', case=False)), 'SCOPE'] = 'TFN'
+df.loc[df['Work Class'].str.contains('New'), 'SCOPE'] = 'NEW'
+df.loc[(df['Work Class'].str.contains('New')) & (df['Description'].str.contains('garage built', case=False)), 'SCOPE'] = 'GAR'
+df.loc[df['Work Class'].str.contains('Addition'), 'SCOPE'] = 'ADD'
+df.loc[(df['Work Class'].str.contains('Addition')) & (df['Description'].str.contains(' deck', case=False)), 'SCOPE'] = 'DEC'
+df.loc[(df['Work Class'].str.contains('Addition')) & (df['Description'].str.contains('new porch', case=False)), 'SCOPE'] = 'POR'
+df.loc[(df['Work Class'].str.contains('Addition')) & (df['Description'].str.contains('pergola', case=False)), 'SCOPE'] = 'POR'
+df.loc[(df['Work Class'].str.contains('Addition')) & (df['Description'].str.contains(' shed', case=False)), 'SCOPE'] = 'OUT'
+df.loc[df['Work Class'].str.contains('Addition and'), 'SCOPE'] = 'ADD'
+df.loc[df['Work Class'].str.contains('Wireless'), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Demo'), 'SCOPE'] = 'DEM'
+df.loc[df['Work Class'].str.contains('Sign'), 'SCOPE'] = 'SGN'
+df.loc[df['Work Class'].str.contains('Fire'), 'SCOPE'] = 'SPK'
+df.loc[(df['Permit Type'].str.contains('Mobile Home')) & (df['Description'].str.contains('replacement', case=False)), 'SCOPE'] = 'MHN'
+df.loc[(df['Permit Type'].str.contains('Mobile Home')) & (df['Description'].str.contains('new', case=False)), 'SCOPE'] = 'MHN'
+df.loc[(df['Work Class'].str.contains('Roofing')) & (df['Description'].str.contains('roof', case=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing')) & (df['Description'].str.contains('single', case=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing')) & (df['Description'].str.contains('SFD', case=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing')) & (df['Description'].str.contains('residential', case=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing')) & (df['Description'].str.contains('multi', case=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing')) & (df['Description'].str.contains('duplex', case=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing')) & (df['Description'].str.contains('re-roof', case=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing')) & (df['Description'].str.contains('re roof', case=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing')) & (df['Description'].str.contains('shingle', case=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing')) & (df['Description'].str.contains('commercial', case=False)), 'SCOPE'] = 'CRR'
+
+# creates an Excel file based on blank parcel fields, this is done as an edit check for the COB permit process just to
+# make sure that there's nothing we're missing. Unfortunately, these will most likely need to be manually entered into
+# CAMA most likely, especially if they have some sort of larger value
+
+df_blank = df[df['Parcel Number'].isna()]
+df_blank.to_excel("Permits_w_no_parcel_num_" + SetDate + '.xlsx')
+
+# sets the parcel column type to a string
+df['Parcel Number'] = df['Parcel Number'].astype('str')
+
+# attempting to turn the date field to remove the time component (hours, minutes, sec)
+df['Finaled Date'] = pd.to_datetime(df['Finaled Date'], format='%Y%m%d', errors='coerce')
+pd.to_datetime(df['Issued Date'], format='%Y%m%d', errors='ignore')
+
+# establishes a connection to the permit database
+cnxn = pyodbc.connect('driver={SQL Server};SERVER=server;DSN=prod;UID=username;PWD=password')
+
+# various SQLs that select from the database
+sql = '''SELECT TOP 200000 parcel.strap, parcel.status_cd, parcel.dor_cd, parcel.nh_cd FROM r_prod.dbo.parcel
+WHERE (parcel.dor_cd <> 'POSS') AND parcel.status_cd = 'A' '''
+
+sql1 = '''SELECT TOP 200000 folio, strap FROM r_prod.dbo.strap_idx'''
+
+sql2 = '''SELECT TOP 100000 permit_num FROM r_prod.dbo.permit WHERE permit.agency_id = 'BLD' '''
+
+sql3 = '''SELECT TOP 200000 site.strap, site.str_num, site.str_pfx, site.str, site.str_sfx, site.str_sfx_dir, 
+site.str_unit FROM r_prod.dbo.site WHERE (site.city IN ('BOULDER', 'UNINCORPORATED'))'''
+
+sql4 = '''SELECT parcel.map_id, parcel.nh_cd, parcel.dor_cd, parcel.strap FROM r_prod.dbo.parcel'''
+
+df_active_acct = pd.read_sql(sql, cnxn)
+df_folio = pd.read_sql(sql1, cnxn)
+df_permit = pd.read_sql(sql2, cnxn)
+df_address = pd.read_sql(sql3, cnxn)
+df_spread_for_app = pd.read_sql(sql4, cnxn)
+
+# Takes the permit database, renames the column to Permit Number, and then merges the month's permit with permits found
+# in the database, this makes sure a permit is not double uploaded, or double valuing
+
+df_permit.rename(columns={'permit_num': 'Permit Number'}, inplace=True)
+df_folio.rename(columns={'folio': "Parcel Number"}, inplace=True)
+
+df1_1 = pd.merge(df, df_permit, on='Permit Number')
+df.set_index('Permit Number', inplace=False)
+df1_1.set_index('Permit Number', inplace=False)
+
+# compares permits that are in CAMA vs ones that aren't, merges df and drops ones that are already in CAMA
+
+df_not_up = df.loc[~df['Permit Number'].isin(df1_1['Permit Number'])]
+df_not_up.drop_duplicates()
+df_not_up.to_excel("Permits_" + SetDate + '_NotInCAMA_Upload.xlsx')
+df1_1.to_excel("Permits_Already_In_CAMA_" + SetDate + '.xlsx')
+print(df_not_up)
+
+# make one df that merges active accounts with the address associated with them
+df_active_addr = pd.merge(df_active_acct, df_address, on='strap')
+print(df_active_addr)
+
+# attempting to take situs address, concat, and compare with the Boulder permit address (only using active accts, no
+# possessory interest)
+
+df_active_addr.dropna(subset=['str_num'])
+df_active_addr['str_num'] = df_active_addr['str_num'].astype(int).astype(str)
+df_active_addr['str_pfx'] = df_active_addr['str_pfx'].fillna(np.nan).replace(np.nan, ' ', regex=True)
+df_active_addr['str_pfx'] = df_active_addr['str_pfx'].replace('  ', ' ', regex=True)
+df_active_addr['str_pfx'] = df_active_addr['str_pfx'].replace('S', ' S', regex=True)
+df_active_addr['str_pfx'] = df_active_addr['str_pfx'].replace('N', ' N', regex=True)
+df_active_addr['str_pfx'] = df_active_addr['str_pfx'].replace('E', ' E', regex=True)
+df_active_addr['str_pfx'] = df_active_addr['str_pfx'].replace('W', ' W', regex=True)
+df_active_addr['str_sfx'] = df_active_addr['str_sfx'].fillna(np.nan).replace(np.nan, ' ', regex=True)
+df_active_addr['str_sfx'] = df_active_addr['str_sfx'].replace('  ', '', regex=True)
+df_active_addr['str_sfx_dir'] = df_active_addr['str_sfx_dir'].fillna(np.nan).replace(np.nan, ' ', regex=True)
+df_active_addr['str_sfx_dir'] = df_active_addr['str_sfx_dir'].replace('  ', ' ', regex=True)
+df_active_addr['str_unit'] = df_active_addr['str_unit'].fillna(np.nan).replace(np.nan, '', regex=True)
+
+# creates a column called Address that is set up in the same format as the Boulder permits table
+df_active_addr['Address'] = df_active_addr['str_num'] + df_active_addr['str_pfx'] + df_active_addr['str'] + \
+                            ' ' + df_active_addr['str_sfx'] + df_active_addr['str_sfx_dir'] + df_active_addr['str_unit']
+df_active_addr['Address'] = df_active_addr['Address'].str.rstrip()
+
+# merges the Boulder accounts database (strap) with the created Address field with the monthly COB permit spreadsheet
+df_permit_addr = df.merge(df_active_addr.drop_duplicates('Address'), how='left', on='Address')
+
+# takes the unmerged addresses and makes a spreadsheet to be checked by hand
+df_permit_addr_nostrap = df_permit_addr.loc[df_permit_addr['strap'].isna()]
+#df_permit_addr_nostrap.to_excel("Unmerged_permits_January2020.xlsx")
+#print(df_permit_addr_nostrap)
+
+# merging the account number to the permit using the parcel number if the permit did not get successfully merged based
+# on the address
+df_permit_addr['strap_final'] = df_permit_addr['strap'].where(df_permit_addr['strap'].notnull(), df_active_addr['strap'])
+
+# merging the final permit spreadsheet with the parcel number data frame
+df_perm_addr_folio = df_permit_addr.merge(df_folio, on='Parcel Number')
+
+# this takes the strap from the folio data frame and fills in the strap with the permit/address data frame if the merge
+# couldn't be completed via the address data frame
+df_perm_addr_folio['strap_final'] = df_perm_addr_folio['strap_x'].where(df_perm_addr_folio['strap_x'].notna(), df_perm_addr_folio['strap_y'])
+
+# this is cleaning up the columns to prepare it to be exported for xlsx and csv
+df_final = df_perm_addr_folio.drop(['strap_y', 'strap_x', 'status_cd', 'dor_cd', 'nh_cd'], axis=1)
+df_final.rename(columns={'strap_final': "strap"}, inplace=True)
+df_final.rename(columns={'str_num': "StreetNo_txt"}, inplace=True)
+df_final['StreetNo_txt'] = df_final['StreetNo_txt'].astype(float)
+df_final.rename(columns={'str_pfx': "StreetDir"}, inplace=True)
+df_final.rename(columns={'str': "StreetName"}, inplace=True)
+df_final.rename(columns={'str_sfx': "StreetType"}, inplace=True)
+df_final.rename(columns={'str_unit': "Unit"}, inplace=True)
+df_final['StreetType'] = df_final['StreetType'].fillna('')
+df_final['Unit'] = df_final['Unit'].fillna('')
+df_final['StreetDir'] = df_final['StreetDir'].fillna('')
+
+# sometimes the address field doesn't merge correctly and fill correctly with the street number, direction, name, type
+# and unit so I took the address data frame and merged it, then filled it based on whether it was NaN
+df_final = pd.merge(df_final, df_address, on='strap')
+df_final['strap'] = df_final['strap'].str.rstrip()
+df_final.drop_duplicates(subset='Permit Number', keep='first', inplace=True)
+df_final['StreetNo_txt'] = df_final['StreetNo_txt'].where(df_final['StreetNo_txt'].notna(), df_final['str_num'])
+df_final['StreetDir'] = df_final['StreetDir'].where(df_final['StreetDir'].notna(), df_final['str_pfx'])
+df_final['StreetName'] = df_final['StreetName'].where(df_final['StreetName'].notna(), df_final['str'])
+df_final['StreetType'] = df_final['StreetType'].where(df_final['StreetType'].notna(), df_final['str_sfx'])
+df_final['Unit'] = df_final['Unit'].where(df_final['Unit'].notna(), df_final['str_unit'])
+
+# preparing the data frame to be exported into a format that will be imported into the permit.exe
+df_final = df_final[["Permit Number", "Parent Permit Number", "strap", "Description", "StreetNo_txt", "StreetDir",
+                     "StreetName", "StreetType", "Unit", "Value Total", "Issued Date", "Finaled Date", "Work Class",
+                     "SCOPE"]]
+
+# a simple way to check to see if an already uploaded permit is in CAMA, it's checked in an earlier line,
+# but if for some reason the CAMA permit upload system doesn't upload the permit successfully,
+# this code can be run again and it will pick up any not uploaded permits at this point
+# During the first run, these two lines are commented out so that it doesn't interfere with the initial upload
+
+df_final = df_final.loc[~df_final['Permit Number'].isin(df1_1['Permit Number'])]
+df_final.drop_duplicates()
+
+print(df_final)
+
+# creating a spreadsheet and csv based on the final product
+df_final.to_excel(SetDate + "_permits.xlsx", index=False)
+df_final.to_csv(SetDate + "_permits.csv", index=False, sep='|', quoting=csv.QUOTE_ALL)
+
+df_spread_for_app['strap'] = df_spread_for_app['strap'].str.rstrip()
+df_final = pd.merge(df_final, df_spread_for_app, on='strap')
+df_final.to_excel(SetDate + "_permits_Appraiser.xlsx", index=False)
+
+# created a df that used an active account with an address and merged off of that, got better results, and most likely
+# the ones that aren't uploaded are in currently unincorporated Boulder

@@ -350,7 +350,6 @@ df_final.to_excel(SetDate + "_permits_Appraiser.xlsx", index=False)
 
 
 # export final data to a txt file to be imported
-
 header = ''  # first, create the header
 for s in list(df_final):
     header += '"' + s + '"|'

@@ -25,6 +25,7 @@ df = pd.read_excel(filename)  # assign df to the chosen file
 # with BLK, INT, or null. These are usually involved in right-of-ways and are not needed for valuation
 # Also drops permits with no parcel number or address, usually right-of-way permits
 
+# TODO - City renamed the columns, so we need to create an if/then block to name it the old way
 # Renaming pin to parcel number
 df = df.rename(columns={'Parcel Number': 'PIN'}, inplace=True)
 #df['Parcel Number'] = df['Parcel Number'].astype(str)

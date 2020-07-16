@@ -25,9 +25,9 @@ df = pd.read_excel(filename)  # assign df to the chosen file
 # with BLK, INT, or null. These are usually involved in right-of-ways and are not needed for valuation
 # Also drops permits with no parcel number or address, usually right-of-way permits
 
-# TODO - City renamed the columns, so we need to create an if/then block to name it the old way
+# TODO - City renamed the columns, so we need to create an if/else block to name it the old way
 # Renaming pin to parcel number
-df = df.rename(columns={'Parcel Number': 'PIN'}, inplace=True)
+#df = df.rename(columns={'Parcel Number': 'PIN'}, inplace=True)
 #df['Parcel Number'] = df['Parcel Number'].astype(str)
 #df['Parcel Number'] = '' + df['Parcel Number']
 
@@ -214,7 +214,9 @@ df['Finaled Date'] = pd.to_datetime(df['Finaled Date'], format='%Y%m%d', errors=
 pd.to_datetime(df['Issued Date'], format='%Y%m%d', errors='ignore')
 
 # establishes a connection to the permit database
-cnxn = pyodbc.connect('driver={SQL Server};SERVER=__server__,1444;DSN=__database__;UID=__user__;PWD=__password__')
+# TODO - update the connection string before implementation
+c_str = open('connection_string.txt', 'r').read()  # can be removed once connection string is added
+cnxn = pyodbc.connect(c_str)  # add connection string here
 
 # various SQLs that select from the database
 sql = '''SELECT TOP 200000 parcel.strap, parcel.status_cd, parcel.dor_cd, parcel.nh_cd FROM r_prod.dbo.parcel

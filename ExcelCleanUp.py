@@ -47,11 +47,6 @@ if 'Work Class' in df:
 elif 'PermitWorkType' in df:
     df = df.rename(columns={'PermitWorkType': 'Work Class'})
 
-# if 'Calculated Valuation' in df:
-#     pass
-# elif '' in df:
-#     df = df.rename(columns={'': 'Calculated Valuation'})
-
 
 # remove if starts with
 df = df[~df['Parcel Number'].str.contains('BLK', na=False)]
@@ -236,6 +231,7 @@ pd.to_datetime(df['Issued Date'], format='%Y%m%d', errors='ignore')
 
 # establishes a connection to the permit database
 # TODO - update the connection string before implementation
+#  --better to keep it separate? easier access?
 c_str = open('connection_string.txt', 'r').read()  # can be removed once connection string is added
 cnxn = pyodbc.connect(c_str)  # add connection string here
 

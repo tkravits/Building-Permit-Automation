@@ -25,11 +25,6 @@ df = pd.read_excel(filename)  # assign df to the chosen file
 # with BLK, INT, or null. These are usually involved in right-of-ways and are not needed for valuation
 # Also drops permits with no parcel number or address, usually right-of-way permits
 
-# Renaming pin to parcel number
-df = df.rename(columns={'Parcel Number': 'PIN'}, inplace=True)
-#df['Parcel Number'] = df['Parcel Number'].astype(str)
-#df['Parcel Number'] = '' + df['Parcel Number']
-
 # remove if starts with
 df = df[~df['Parcel Number'].str.contains('BLK', na=False)]
 df = df[~df['Parcel Number'].str.contains('INT', na=False)]
@@ -213,7 +208,7 @@ df['Finaled Date'] = pd.to_datetime(df['Finaled Date'], format='%Y%m%d', errors=
 pd.to_datetime(df['Issued Date'], format='%Y%m%d', errors='ignore')
 
 # establishes a connection to the permit database
-cnxn = pyodbc.connect('driver={SQL Server};SERVER=__server__,1444;DSN=__database__;UID=__user__;PWD=__password__')
+cnxn = pyodbc.connect('driver={SQL Server};SERVER=__server__;DSN=__database__;UID=__user__;PWD=__password__')
 
 # various SQLs that select from the database
 sql = '''SELECT TOP 200000 parcel.strap, parcel.status_cd, parcel.dor_cd, parcel.nh_cd FROM r_prod.dbo.parcel
@@ -251,14 +246,12 @@ df_not_up.drop_duplicates()
 
 print('\n\n----- df_not_up -----\n')
 print(df_not_up.head(2))
-# print preview
 
 
 # make one df that merges active accounts with the address associated with them
 df_active_addr = pd.merge(df_active_acct, df_address, on='strap')
 print('\n\n----- df_active_addr -----\n')
 print(df_active_addr.head(2))
-# print preview
 
 # attempting to take situs address, concat, and compare with the Boulder permit address (only using active accts, no
 # possessory interest)
@@ -341,7 +334,6 @@ df_final.drop_duplicates()
 
 print('\n\n----- df_final (1) -----\n')
 print(df_final.head(2))
-# print preview
 
 # spreadsheet for app.
 df_spread_for_app['strap'] = df_spread_for_app['strap'].str.rstrip()
@@ -350,7 +342,6 @@ df_final.to_excel(SetDate + "_permits_Appraiser.xlsx", index=False)
 
 
 # export final data to a txt file to be imported
-
 header = ''  # first, create the header
 for s in list(df_final):
     header += '"' + s + '"|'
@@ -362,7 +353,6 @@ df_final.update(df_final[["Permit Number", "Parent Permit Number", "strap", "Des
 
 print('\n\n----- df_final (2) -----\n')
 print(df_final.head(2))
-# print preview
 
 # now, save to a text file with a | separator
 np.savetxt(SetDate + '_permits.txt', df_final.values, fmt='%s', header=header, comments='', delimiter='|')

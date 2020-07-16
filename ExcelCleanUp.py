@@ -26,10 +26,32 @@ df = pd.read_excel(filename)  # assign df to the chosen file
 # Also drops permits with no parcel number or address, usually right-of-way permits
 
 # TODO - City renamed the columns, so we need to create an if/else block to name it the old way
-# Renaming pin to parcel number
-#df = df.rename(columns={'Parcel Number': 'PIN'}, inplace=True)
-#df['Parcel Number'] = df['Parcel Number'].astype(str)
-#df['Parcel Number'] = '' + df['Parcel Number']
+# Renaming columns
+if 'Parcel Number' in df:
+    pass  # if already named Parcel Number, do nothing
+elif 'PIN' in df:
+    df = df.rename(columns={'PIN': 'Parcel Number'})  # else if named pin, rename it
+
+if 'Address' in df:
+    pass
+elif 'OriginalAddress' in df:
+    df = df.rename(columns={'OriginalAddress': 'Address'})
+
+if 'Status' in df:
+    pass
+elif 'StatusCurrent' in df:
+    df = df.rename(columns={'StatusCurrent': 'Status'})
+
+if 'Work Class' in df:
+    pass
+elif 'PermitWorkType' in df:
+    df = df.rename(columns={'PermitWorkType': 'Work Class'})
+
+# if 'Calculated Valuation' in df:
+#     pass
+# elif '' in df:
+#     df = df.rename(columns={'': 'Calculated Valuation'})
+
 
 # remove if starts with
 df = df[~df['Parcel Number'].str.contains('BLK', na=False)]
@@ -39,7 +61,6 @@ df.dropna(subset=['Parcel Number', 'Address'])
 df_review = df[df['Status'].str.contains('In Review')]
 df = df[~df['Work Class'].str.contains('Information')]
 df = df[~df['Work Class'].str.contains('Temporary Event')]
-
 
 # these are the permits that are in review (aren't uploaded to cama)
 df_review.to_excel("Permits_In_Review_" + SetDate + '.xlsx')
@@ -251,7 +272,6 @@ df1_1.set_index('Permit Number', inplace=False)
 df_not_up = df.loc[~df['Permit Number'].isin(df1_1['Permit Number'])]
 df_not_up.drop_duplicates()
 
-
 print('\n\n----- df_not_up -----\n')
 print(df_not_up.head(2))
 # print preview
@@ -290,7 +310,6 @@ df_permit_addr = df.merge(df_active_addr.drop_duplicates('Address'), how='left',
 
 # takes the unmerged addresses and makes a spreadsheet to be checked by hand
 df_permit_addr_nostrap = df_permit_addr.loc[df_permit_addr['strap'].isna()]
-
 
 # merging the account number to the permit using the parcel number if the permit did not get successfully merged based
 # on the address
@@ -350,7 +369,6 @@ print(df_final.head(2))
 df_spread_for_app['strap'] = df_spread_for_app['strap'].str.rstrip()
 df_final = pd.merge(df_final, df_spread_for_app, on='strap')
 df_final.to_excel(SetDate + "_permits_Appraiser.xlsx", index=False)
-
 
 # export final data to a txt file to be imported
 header = ''  # first, create the header

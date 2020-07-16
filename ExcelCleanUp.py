@@ -25,6 +25,7 @@ df = pd.read_excel(filename)  # assign df to the chosen file
 # with BLK, INT, or null. These are usually involved in right-of-ways and are not needed for valuation
 # Also drops permits with no parcel number or address, usually right-of-way permits
 
+# TODO - create an if/then block to cycle through the column names and revert them to the "old" names
 # Renaming pin to parcel number
 df = df.rename(columns={'Parcel Number': 'PIN'}, inplace=True)
 #df['Parcel Number'] = df['Parcel Number'].astype(str)
@@ -33,15 +34,19 @@ df = df.rename(columns={'Parcel Number': 'PIN'}, inplace=True)
 # remove if starts with
 df = df[~df['Parcel Number'].str.contains('BLK', na=False)]
 df = df[~df['Parcel Number'].str.contains('INT', na=False)]
+
 # remove missing values
 df.dropna(subset=['Parcel Number', 'Address'])
 df_review = df[df['Status'].str.contains('In Review')]
+
+
 df = df[~df['Work Class'].str.contains('Information')]
 df = df[~df['Work Class'].str.contains('Temporary Event')]
 
 
 # these are the permits that are in review (aren't uploaded to cama)
 df_review.to_excel("Permits_In_Review_" + SetDate + '.xlsx')
+
 
 # removes Pending, Void, In Review, Withdrawn, Approved for permits in the Status. We only want permits that
 # either have been issued or are already completed since permit value and other areas can change.

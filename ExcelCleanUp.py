@@ -25,8 +25,11 @@ df = pd.read_excel(filename)  # assign df to the chosen file
 # with BLK, INT, or null. These are usually involved in right-of-ways and are not needed for valuation
 # Also drops permits with no parcel number or address, usually right-of-way permits
 
-# TODO - City renamed the columns, so we need to create an if/else block to name it the old way
-# Renaming columns
+
+# The City changed some columns, the below if/elif blocks rename these to work with our code.
+# This can be continually updated with new elif statements as needed.
+# Structuring the script this way means it's still able to run old permit files as well as new ones.
+
 if 'Parcel Number' in df:
     pass  # if already named Parcel Number, do nothing
 elif 'PIN' in df:

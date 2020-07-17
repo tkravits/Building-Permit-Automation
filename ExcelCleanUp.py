@@ -25,6 +25,29 @@ df = pd.read_excel(filename)  # assign df to the chosen file
 # with BLK, INT, or null. These are usually involved in right-of-ways and are not needed for valuation
 # Also drops permits with no parcel number or address, usually right-of-way permits
 
+# TODO - City renamed the columns, so we need to create an if/else block to name it the old way
+# Renaming columns
+if 'Parcel Number' in df:
+    pass  # if already named Parcel Number, do nothing
+elif 'PIN' in df:
+    df = df.rename(columns={'PIN': 'Parcel Number'})  # else if named pin, rename it
+
+if 'Address' in df:
+    pass
+elif 'OriginalAddress' in df:
+    df = df.rename(columns={'OriginalAddress': 'Address'})
+
+if 'Status' in df:
+    pass
+elif 'StatusCurrent' in df:
+    df = df.rename(columns={'StatusCurrent': 'Status'})
+
+if 'Work Class' in df:
+    pass
+elif 'PermitWorkType' in df:
+    df = df.rename(columns={'PermitWorkType': 'Work Class'})
+
+
 # remove if starts with
 df = df[~df['Parcel Number'].str.contains('BLK', na=False)]
 df = df[~df['Parcel Number'].str.contains('INT', na=False)]
@@ -33,7 +56,6 @@ df.dropna(subset=['Parcel Number', 'Address'])
 df_review = df[df['Status'].str.contains('In Review')]
 df = df[~df['Work Class'].str.contains('Information')]
 df = df[~df['Work Class'].str.contains('Temporary Event')]
-
 
 # these are the permits that are in review (aren't uploaded to cama)
 df_review.to_excel("Permits_In_Review_" + SetDate + '.xlsx')
@@ -208,7 +230,10 @@ df['Finaled Date'] = pd.to_datetime(df['Finaled Date'], format='%Y%m%d', errors=
 pd.to_datetime(df['Issued Date'], format='%Y%m%d', errors='ignore')
 
 # establishes a connection to the permit database
-cnxn = pyodbc.connect('driver={SQL Server};SERVER=__server__;DSN=__database__;UID=__user__;PWD=__password__')
+# TODO - update the connection string before implementation
+#  --better to keep it separate? easier access?
+c_str = open('connection_string.txt', 'r').read()  # can be removed once connection string is added
+cnxn = pyodbc.connect(c_str)  # add connection string here
 
 # various SQLs that select from the database
 sql = '''SELECT TOP 200000 parcel.strap, parcel.status_cd, parcel.dor_cd, parcel.nh_cd FROM r_prod.dbo.parcel
@@ -243,15 +268,16 @@ df1_1.set_index('Permit Number', inplace=False)
 df_not_up = df.loc[~df['Permit Number'].isin(df1_1['Permit Number'])]
 df_not_up.drop_duplicates()
 
-
 print('\n\n----- df_not_up -----\n')
 print(df_not_up.head(2))
+# print preview
 
 
 # make one df that merges active accounts with the address associated with them
 df_active_addr = pd.merge(df_active_acct, df_address, on='strap')
 print('\n\n----- df_active_addr -----\n')
 print(df_active_addr.head(2))
+# print preview
 
 # attempting to take situs address, concat, and compare with the Boulder permit address (only using active accts, no
 # possessory interest)
@@ -280,7 +306,6 @@ df_permit_addr = df.merge(df_active_addr.drop_duplicates('Address'), how='left',
 
 # takes the unmerged addresses and makes a spreadsheet to be checked by hand
 df_permit_addr_nostrap = df_permit_addr.loc[df_permit_addr['strap'].isna()]
-
 
 # merging the account number to the permit using the parcel number if the permit did not get successfully merged based
 # on the address
@@ -334,12 +359,12 @@ df_final.drop_duplicates()
 
 print('\n\n----- df_final (1) -----\n')
 print(df_final.head(2))
+# print preview
 
 # spreadsheet for app.
 df_spread_for_app['strap'] = df_spread_for_app['strap'].str.rstrip()
 df_final = pd.merge(df_final, df_spread_for_app, on='strap')
 df_final.to_excel(SetDate + "_permits_Appraiser.xlsx", index=False)
-
 
 # export final data to a txt file to be imported
 header = ''  # first, create the header
@@ -353,6 +378,7 @@ df_final.update(df_final[["Permit Number", "Parent Permit Number", "strap", "Des
 
 print('\n\n----- df_final (2) -----\n')
 print(df_final.head(2))
+# print preview
 
 # now, save to a text file with a | separator
 np.savetxt(SetDate + '_permits.txt', df_final.values, fmt='%s', header=header, comments='', delimiter='|')

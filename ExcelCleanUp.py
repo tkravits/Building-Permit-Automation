@@ -75,16 +75,22 @@ df['Description'].replace(regex=True, inplace=True, to_replace=r'\r', value=r'')
 
 # creates a column named Value Total, sets it to 0, and sums values that the City divides up into different categories
 df['Value Total'] = '0'
-df['Value Total'] = df.iloc[:, 14:29].sum(axis=1)
-cols = [1, 9, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
 
-# removes the different valuation category columns the City provides
-df.drop(df.columns[cols], axis=1, inplace=True)
+# only sum the columns if needed (old version), else use the field from the new version
+if 'EstProjectCost' in df:
+    df['Value Total'] = df['EstProjectCost']
+else:
+    df['Value Total'] = df.iloc[:, 14:29].sum(axis=1)
+    cols = [1, 9, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
 
-calc_value = df['Calculated Valuation']
-updated_calc = df['Value Total'] == 0
-df.loc[updated_calc, 'Value Total'] = calc_value
-df.drop(df.columns[10], axis=1, inplace=True)
+    # removes the different valuation category columns the City provides
+    df.drop(df.columns[cols], axis=1, inplace=True)
+    calc_value = df['Calculated Valuation']
+    updated_calc = df['Value Total'] == 0
+    df.loc[updated_calc, 'Value Total'] = calc_value
+    df.drop(df.columns[10], axis=1, inplace=True)
+
+
 df['Value Total'] = df['Value Total'].fillna(0)
 df['Description'] = df['Description'].fillna('No Description')
 df['Value Total'] = df['Value Total'].astype('int')

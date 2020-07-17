@@ -67,6 +67,11 @@ if 'Permit Number' in df:
 elif 'PermitNum' in df:
     df = df.rename(columns={'PermitNum': 'Permit Number'})
 
+if 'Parent Permit Number' in df:
+    pass
+elif 'MasterPermitNum' in df:
+    df = df.rename(columns={'MasterPermitNum': 'Parent Permit Number'})
+
 
 # remove if starts with
 df = df[~df['Parcel Number'].str.contains('BLK', na=False)]

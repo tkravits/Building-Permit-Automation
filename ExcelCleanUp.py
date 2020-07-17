@@ -47,6 +47,26 @@ if 'Work Class' in df:
 elif 'PermitWorkType' in df:
     df = df.rename(columns={'PermitWorkType': 'Work Class'})
 
+if 'Permit Type' in df:
+    pass
+elif 'PermitType' in df:
+    df = df.rename(columns={'PermitType': 'Permit Type'})
+
+if 'Finaled Date' in df:
+    pass
+elif 'CompletedDate' in df:
+    df = df.rename(columns={'CompletedDate': 'Finaled Date'})
+
+if 'Issued Date' in df:
+    pass
+elif 'IssuedDate' in df:
+    df = df.rename(columns={'IssuedDate': 'Issued Date'})
+
+if 'Permit Number' in df:
+    pass
+elif 'PermitNum' in df:
+    df = df.rename(columns={'PermitNum': 'Permit Number'})
+
 
 # remove if starts with
 df = df[~df['Parcel Number'].str.contains('BLK', na=False)]

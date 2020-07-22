@@ -96,10 +96,11 @@ df = df[~df['Status'].str.contains('In Review')]
 df = df[~df['Status'].str.contains('Withdrawn')]
 df = df[~df['Status'].str.contains('Approved for')]
 
-# removes * and carriage returns
+# removes *, ", and carriage returns
 df['Description'].replace(regex=True, inplace=True, to_replace=r'\*', value=r'')
 df['Description'].replace(regex=True, inplace=True, to_replace=r'\n', value=r'')
 df['Description'].replace(regex=True, inplace=True, to_replace=r'\r', value=r'')
+df['Description'].replace(regex=True, inplace=True, to_replace=r'\*', value=r'')
 
 # creates a column named Value Total, sets it to 0, and sums values that the City divides up into different categories
 df['Value Total'] = '0'

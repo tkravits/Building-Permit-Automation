@@ -159,6 +159,9 @@ df.loc[(df['Work Class'].str.contains('Mechanical')) & (
     df['Description'].str.contains('gas fireplace', case=False)), 'SCOPE'] = 'GFP'
 df.loc[(df['Work Class'].str.contains('Mechanical')) & (
     df['Description'].str.contains('existing wood-burning', case=False)), 'SCOPE'] = 'GFP'
+df.loc[(df['Work Class'].str.contains('Mechanical')) & (
+    df['Description'].str.contains('wood burning', case=False)
+    & (df['Description'].str.contains('replace', case=False))), 'SCOPE'] = 'GFP'
 df.loc[df['Work Class'].str.contains('Repair'), 'SCOPE'] = 'GRP'
 df.loc[(df['Work Class'].str.contains('Repair')) & (
     df['Description'].str.contains('foundation', case=False)), 'SCOPE'] = 'SRP'

@@ -400,6 +400,9 @@ df_spread_for_app['strap'] = df_spread_for_app['strap'].str.rstrip()
 df_final = pd.merge(df_final, df_spread_for_app, on='strap')
 df_final.to_excel(SetDate + "_permits_Appraiser.xlsx", index=False)
 
+# remove map_id, nh_cd, and dor_cd from the text file
+df_final = df_final.drop(['map_id', 'nh_cd', 'dor_cd'], axis=1)
+
 # export final data to a txt file to be imported
 header = ''  # first, create the header
 for s in list(df_final):

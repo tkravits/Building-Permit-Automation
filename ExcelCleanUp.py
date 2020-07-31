@@ -357,6 +357,7 @@ df_perm_addr_folio = df_permit_addr.merge(df_folio, on='Parcel Number')
 # couldn't be completed via the address data frame
 df_perm_addr_folio['strap_final'] = df_perm_addr_folio['strap_x'].where(df_perm_addr_folio['strap_x'].notna(),
                                                                         df_perm_addr_folio['strap_y'])
+df_perm_addr_folio.fillna('')
 
 # this is cleaning up the columns to prepare it to be exported for xlsx
 df_final = df_perm_addr_folio.drop(['strap_y', 'strap_x', 'status_cd', 'dor_cd', 'nh_cd'], axis=1)
@@ -398,6 +399,8 @@ df_final.drop_duplicates()
 print('\n\n----- df_final (1) -----\n')
 print(df_final.head(2))
 # print preview
+
+df_final = df_final.fillna('')
 
 # spreadsheet for app.
 df_spread_for_app['strap'] = df_spread_for_app['strap'].str.rstrip()

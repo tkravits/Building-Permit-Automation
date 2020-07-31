@@ -17,9 +17,12 @@ CurrentDate = pd.Timestamp.today()
 SetDate = (CurrentDate - pd.DateOffset(months=1)).strftime("%B%Y")
 
 # imports the permit sheet to be cleaned up
+print('Opening file window...\n')
 Tk().withdraw()  # this prevents root tkinter window from appearing
 filename = askopenfilename(filetypes=[('Excel', ('*.xls', '*.xlsx'))])  # this opens a window to choose out excel sheet
 df = pd.read_excel(filename)  # assign df to the chosen file
+# print status
+print('Data loading...\n')
 
 # removes Information permits in both the Permit Type and Work Class fields, also removes any parcel number that starts
 # with BLK, INT, or null. These are usually involved in right-of-ways and are not needed for valuation
@@ -270,6 +273,7 @@ pd.to_datetime(df['Issued Date'], format='%Y%m%d', errors='ignore')
 # establishes a connection to the permit database
 # TODO - update the connection string before implementation
 #  --better to keep it separate? easier access?
+print('Establishing connection...\n')
 c_str = open('connection_string.txt', 'r').read()  # can be removed once connection string is added
 cnxn = pyodbc.connect(c_str)  # add connection string here
 
@@ -286,6 +290,7 @@ site.str_unit FROM r_prod.dbo.site WHERE (site.city IN ('BOULDER', 'UNINCORPORAT
 
 sql4 = '''SELECT parcel.map_id, parcel.nh_cd, parcel.dor_cd, parcel.strap FROM r_prod.dbo.parcel'''
 
+print('Querying database...\n')
 df_active_acct = pd.read_sql(sql, cnxn)
 df_folio = pd.read_sql(sql1, cnxn)
 df_permit = pd.read_sql(sql2, cnxn)

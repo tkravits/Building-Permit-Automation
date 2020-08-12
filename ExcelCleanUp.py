@@ -19,8 +19,11 @@ SetDate = (CurrentDate - pd.DateOffset(months=1)).strftime("%B%Y")
 # imports the permit sheet to be cleaned up
 print('Opening file window...\n')
 Tk().withdraw()  # this prevents root tkinter window from appearing
-filename = askopenfilename(filetypes=[('Excel', ('*.xls', '*.xlsx'))])  # this opens a window to choose out excel sheet
-df = pd.read_excel(filename)  # assign df to the chosen file
+filename = askopenfilename(filetypes=[('Excel', ('*.xls', '*.xlsx')), ('CSV', ('*.csv'))])  # this opens a window to choose out excel sheet
+try:
+    df = pd.read_excel(filename)  # assign df to the chosen
+except:
+    df = pd.read_csv(filename, sep=",", error_bad_lines=False, index_col=False, encoding='ISO-8859-1')
 # print status
 print('Data loading...\n')
 
@@ -84,20 +87,20 @@ df = df[~df['Parcel Number'].str.contains('BLK', na=False)]
 df = df[~df['Parcel Number'].str.contains('INT', na=False)]
 # remove missing values
 df.dropna(subset=['Parcel Number', 'Address'])
-df_review = df[df['Status'].str.contains('In Review')]
-df = df[~df['Work Class'].str.contains('Information')]
-df = df[~df['Work Class'].str.contains('Temporary Event')]
+df_review = df[df['Status'].str.contains('In Review', na=False)]
+df = df[~df['Work Class'].str.contains('Information', na=False)]
+df = df[~df['Work Class'].str.contains('Temporary Event', na=False)]
 
 # these are the permits that are in review (aren't uploaded to cama)
 df_review.to_excel("Permits_In_Review_" + SetDate + '.xlsx')
 
 # removes Pending, Void, In Review, Withdrawn, Approved for permits in the Status. We only want permits that
 # either have been issued or are already completed since permit value and other areas can change.
-df = df[~df['Status'].str.contains('Pending')]
-df = df[~df['Status'].str.contains('Void')]
-df = df[~df['Status'].str.contains('In Review')]
-df = df[~df['Status'].str.contains('Withdrawn')]
-df = df[~df['Status'].str.contains('Approved for')]
+df = df[~df['Status'].str.contains('Pending', na=False)]
+df = df[~df['Status'].str.contains('Void', na=False)]
+df = df[~df['Status'].str.contains('In Review', na=False)]
+df = df[~df['Status'].str.contains('Withdrawn', na=False)]
+df = df[~df['Status'].str.contains('Approved for', na=False)]
 
 # removes *, ", and carriage returns
 df['Description'].replace(regex=True, inplace=True, to_replace=r'\*', value=r'')
@@ -135,126 +138,126 @@ df['SCOPE'] = 'N/A'
 # towards the end of these)
 
 
-df.loc[df['Work Class'].str.contains('Temporary', case=False), 'SCOPE'] = 'ELM'
-df.loc[df['Work Class'].str.contains('Construction', case=False), 'SCOPE'] = 'OTH'
-df.loc[df['Description'].str.contains('RTU', case=False), 'SCOPE'] = 'HTG'
-df.loc[df['Description'].str.contains('RTUs', case=False), 'SCOPE'] = 'HTG'
-df.loc[df['Work Class'].str.contains('Mechanical'), 'SCOPE'] = 'ELM'
-df.loc[df['Work Class'].str.contains('Electrical', case=False), 'SCOPE'] = 'ELM'
-df.loc[df['Work Class'].str.contains('Grading'), 'SCOPE'] = 'OTH'
-df.loc[df['Work Class'].str.contains('Groundwater'), 'SCOPE'] = 'OTH'
-df.loc[df['Work Class'].str.contains('Erosion'), 'SCOPE'] = 'OTH'
-df.loc[df['Work Class'].str.contains('Roofing'), 'SCOPE'] = 'RRR'
-df.loc[df['Description'].str.contains('heat', case=False), 'SCOPE'] = 'OTH'
-df.loc[df['Work Class'].str.contains('Non-Public'), 'SCOPE'] = 'OTH'
-df.loc[df['Work Class'].str.contains('Public'), 'SCOPE'] = 'OTH'
-df.loc[df['Description'].str.contains('boiler', case=False), 'SCOPE'] = 'OTH'
-df.loc[df['Description'].str.contains('ductless', case=False), 'SCOPE'] = 'HTG'
-df.loc[df['Description'].str.contains('furnace', case=False), 'SCOPE'] = 'HTG'
-df.loc[df['Description'].str.contains('heater', case=False), 'SCOPE'] = 'OTH'
-df.loc[df['Description'].str.contains('PV', case=False), 'SCOPE'] = 'ENR'
-df.loc[df['Description'].str.contains('solar', case=False), 'SCOPE'] = 'ENR'
-df.loc[df['Description'].str.contains('photo', case=False), 'SCOPE'] = 'ENR'
-df.loc[df['Description'].str.contains('P.V.', case=False), 'SCOPE'] = 'ENR'
-df.loc[df['Description'].str.contains('photovoltaic', case=False), 'SCOPE'] = 'ENR'
-df.loc[df['Description'].str.contains('geotherm', case=False), 'SCOPE'] = 'ENR'
-df.loc[df['Description'].str.contains('flush-mounted', case=False), 'SCOPE'] = 'ENR'
-df.loc[(df['Work Class'].str.contains('Mechanical')) & (
-    df['Description'].str.contains('gas fireplace', case=False)), 'SCOPE'] = 'GFP'
-df.loc[(df['Work Class'].str.contains('Mechanical')) & (
-    df['Description'].str.contains('existing wood-burning', case=False)), 'SCOPE'] = 'GFP'
-df.loc[(df['Work Class'].str.contains('Mechanical')) & (
-    df['Description'].str.contains('wood burning', case=False)
-    & (df['Description'].str.contains('replace', case=False))), 'SCOPE'] = 'GFP'
-df.loc[df['Work Class'].str.contains('Repair'), 'SCOPE'] = 'GRP'
-df.loc[(df['Work Class'].str.contains('Repair')) & (
-    df['Description'].str.contains('foundation', case=False)), 'SCOPE'] = 'SRP'
-df.loc[(df['Work Class'].str.contains('Repair')) & (
-    df['Description'].str.contains('structural', case=False)), 'SCOPE'] = 'SRP'
+df.loc[df['Work Class'].str.contains('Temporary', case=False, na=False), 'SCOPE'] = 'ELM'
+df.loc[df['Work Class'].str.contains('Construction', case=False, na=False), 'SCOPE'] = 'OTH'
+df.loc[df['Description'].str.contains('RTU', case=False, na=False), 'SCOPE'] = 'HTG'
+df.loc[df['Description'].str.contains('RTUs', case=False, na=False), 'SCOPE'] = 'HTG'
+df.loc[df['Work Class'].str.contains('Mechanical', na=False), 'SCOPE'] = 'ELM'
+df.loc[df['Work Class'].str.contains('Electrical', case=False, na=False), 'SCOPE'] = 'ELM'
+df.loc[df['Work Class'].str.contains('Grading', na=False), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Groundwater', na=False), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Erosion', na=False), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Roofing', na=False), 'SCOPE'] = 'RRR'
+df.loc[df['Description'].str.contains('heat', case=False, na=False), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Non-Public', na=False), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Public', na=False), 'SCOPE'] = 'OTH'
+df.loc[df['Description'].str.contains('boiler', case=False, na=False), 'SCOPE'] = 'OTH'
+df.loc[df['Description'].str.contains('ductless', case=False, na=False), 'SCOPE'] = 'HTG'
+df.loc[df['Description'].str.contains('furnace', case=False, na=False), 'SCOPE'] = 'HTG'
+df.loc[df['Description'].str.contains('heater', case=False, na=False), 'SCOPE'] = 'OTH'
+df.loc[df['Description'].str.contains('PV', case=False, na=False), 'SCOPE'] = 'ENR'
+df.loc[df['Description'].str.contains('solar', case=False, na=False), 'SCOPE'] = 'ENR'
+df.loc[df['Description'].str.contains('photo', case=False, na=False), 'SCOPE'] = 'ENR'
+df.loc[df['Description'].str.contains('P.V.', case=False, na=False), 'SCOPE'] = 'ENR'
+df.loc[df['Description'].str.contains('photovoltaic', case=False, na=False), 'SCOPE'] = 'ENR'
+df.loc[df['Description'].str.contains('geotherm', case=False, na=False), 'SCOPE'] = 'ENR'
+df.loc[df['Description'].str.contains('flush-mounted', case=False, na=False), 'SCOPE'] = 'ENR'
+df.loc[(df['Work Class'].str.contains('Mechanical', na=False)) & (
+    df['Description'].str.contains('gas fireplace', case=False, na=False)), 'SCOPE'] = 'GFP'
+df.loc[(df['Work Class'].str.contains('Mechanical', na=False)) & (
+    df['Description'].str.contains('existing wood-burning', case=False, na=False)), 'SCOPE'] = 'GFP'
+df.loc[(df['Work Class'].str.contains('Mechanical', na=False)) & (
+    df['Description'].str.contains('wood burning', case=False, na=False)
+    & (df['Description'].str.contains('replace', case=False, na=False))), 'SCOPE'] = 'GFP'
+df.loc[df['Work Class'].str.contains('Repair', na=False), 'SCOPE'] = 'GRP'
+df.loc[(df['Work Class'].str.contains('Repair', na=False)) & (
+    df['Description'].str.contains('foundation', case=False, na=False)), 'SCOPE'] = 'SRP'
+df.loc[(df['Work Class'].str.contains('Repair', na=False)) & (
+    df['Description'].str.contains('structural', case=False, na=False)), 'SCOPE'] = 'SRP'
 df.loc[
-    (df['Work Class'].str.contains('Repair')) & (df['Description'].str.contains('fire', case=False)), 'SCOPE'] = 'FRP'
-df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (
-    df['Description'].str.contains('gas fireplace', case=False)), 'SCOPE'] = 'GFP'
-df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (
-    df['Description'].str.contains('mini-split', case=False)), 'SCOPE'] = 'AIR'
-df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (
-    df['Description'].str.contains('mini split', case=False)), 'SCOPE'] = 'AIR'
-df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (
-    df['Description'].str.contains('condenser', case=False)), 'SCOPE'] = 'AIR'
-df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (
-    df['Description'].str.contains('air condition', case=False)), 'SCOPE'] = 'AIR'
-df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (
-    df['Description'].str.contains('a/c', case=False)), 'SCOPE'] = 'AIR'
-df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (
-    df['Description'].str.contains(' ac ', case=False)), 'SCOPE'] = 'AIR'
-df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (
-    df['Description'].str.contains(' ac', case=False)), 'SCOPE'] = 'AIR'
-df.loc[(df['Work Class'].str.contains('Mechanical HVAC')) & (
-    df['Description'].str.contains(' a/c ', case=False)), 'SCOPE'] = 'AIR'
-df.loc[df['Work Class'].str.contains('Mechanical Sub-'), 'SCOPE'] = 'ELM'
-df.loc[df['Work Class'].str.contains('Plumbing'), 'SCOPE'] = 'ELM'
-df.loc[df['Work Class'].str.contains('Electrical Sub-'), 'SCOPE'] = 'ELM'
-df.loc[df['Work Class'].str.contains('Utility'), 'SCOPE'] = 'OTH'
-df.loc[df['Work Class'].str.contains('Siding'), 'SCOPE'] = 'SDG'
-df.loc[df['Work Class'].str.contains('Right'), 'SCOPE'] = 'OTH'
-df.loc[(df['Work Class'].str.contains('Right')) & (
-    df['Description'].str.contains('sewer', case=False)), 'SCOPE'] = 'RWSRPR'
-df.loc[df['Work Class'].str.contains('Fence'), 'SCOPE'] = 'FEN'
-df.loc[df['Work Class'].str.contains('Tenant'), 'SCOPE'] = 'TFN'
-df.loc[df['Work Class'].str.contains('Remodel'), 'SCOPE'] = 'REM'
-df.loc[(df['Work Class'].str.contains('Remodel')) & (
-    df['Description'].str.contains('finished basement', case=False)), 'SCOPE'] = 'BFN'
-df.loc[(df['Work Class'].str.contains('Remodel')) & (
-    df['Description'].str.contains('basement finish', case=False)), 'SCOPE'] = 'BFN'
-df.loc[(df['Work Class'].str.contains('Remodel')) & (
-    df['Description'].str.contains('basement remodel', case=False)), 'SCOPE'] = 'BFN'
-df.loc[(df['Work Class'].str.contains('Remodel')) & (
-    df['Description'].str.contains('bathroom remodel', case=False)), 'SCOPE'] = 'BTH'
-df.loc[(df['Work Class'].str.contains('Remodel')) & (
-    df['Description'].str.contains('bath remodel', case=False)), 'SCOPE'] = 'BTH'
-df.loc[(df['Work Class'].str.contains('Remodel')) & (
-    df['Description'].str.contains('tenant', case=False)), 'SCOPE'] = 'TFN'
-df.loc[df['Work Class'].str.contains('New'), 'SCOPE'] = 'NEW'
-df.loc[(df['Work Class'].str.contains('New')) & (
-    df['Description'].str.contains('garage built', case=False)), 'SCOPE'] = 'GAR'
-df.loc[df['Work Class'].str.contains('Addition'), 'SCOPE'] = 'ADD'
-df.loc[(df['Work Class'].str.contains('Addition')) & (
-    df['Description'].str.contains(' deck', case=False)), 'SCOPE'] = 'DEC'
-df.loc[(df['Work Class'].str.contains('Addition')) & (
-    df['Description'].str.contains('new porch', case=False)), 'SCOPE'] = 'POR'
-df.loc[(df['Work Class'].str.contains('Addition')) & (
-    df['Description'].str.contains('pergola', case=False)), 'SCOPE'] = 'POR'
-df.loc[(df['Work Class'].str.contains('Addition')) & (
-    df['Description'].str.contains(' shed', case=False)), 'SCOPE'] = 'OUT'
-df.loc[df['Work Class'].str.contains('Addition and'), 'SCOPE'] = 'ADD'
-df.loc[df['Work Class'].str.contains('Wireless'), 'SCOPE'] = 'OTH'
-df.loc[df['Work Class'].str.contains('Demo'), 'SCOPE'] = 'DEM'
-df.loc[df['Work Class'].str.contains('Sign'), 'SCOPE'] = 'SGN'
-df.loc[df['Work Class'].str.contains('Fire'), 'SCOPE'] = 'SPK'
-df.loc[(df['Permit Type'].str.contains('Mobile Home')) & (
-    df['Description'].str.contains('replacement', case=False)), 'SCOPE'] = 'MHN'
-df.loc[(df['Permit Type'].str.contains('Mobile Home')) & (
-    df['Description'].str.contains('new', case=False)), 'SCOPE'] = 'MHN'
+    (df['Work Class'].str.contains('Repair', na=False)) & (df['Description'].str.contains('fire', case=False, na=False)), 'SCOPE'] = 'FRP'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC', na=False)) & (
+    df['Description'].str.contains('gas fireplace', case=False, na=False)), 'SCOPE'] = 'GFP'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC', na=False)) & (
+    df['Description'].str.contains('mini-split', case=False, na=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC', na=False)) & (
+    df['Description'].str.contains('mini split', case=False, na=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC', na=False)) & (
+    df['Description'].str.contains('condenser', case=False, na=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC', na=False)) & (
+    df['Description'].str.contains('air condition', case=False, na=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC', na=False)) & (
+    df['Description'].str.contains('a/c', case=False, na=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC', na=False)) & (
+    df['Description'].str.contains(' ac ', case=False, na=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC', na=False)) & (
+    df['Description'].str.contains(' ac', case=False, na=False)), 'SCOPE'] = 'AIR'
+df.loc[(df['Work Class'].str.contains('Mechanical HVAC', na=False)) & (
+    df['Description'].str.contains(' a/c ', case=False, na=False)), 'SCOPE'] = 'AIR'
+df.loc[df['Work Class'].str.contains('Mechanical Sub-', na=False), 'SCOPE'] = 'ELM'
+df.loc[df['Work Class'].str.contains('Plumbing', na=False), 'SCOPE'] = 'ELM'
+df.loc[df['Work Class'].str.contains('Electrical Sub-', na=False), 'SCOPE'] = 'ELM'
+df.loc[df['Work Class'].str.contains('Utility', na=False), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Siding', na=False), 'SCOPE'] = 'SDG'
+df.loc[df['Work Class'].str.contains('Right', na=False), 'SCOPE'] = 'OTH'
+df.loc[(df['Work Class'].str.contains('Right', na=False)) & (
+    df['Description'].str.contains('sewer', case=False, na=False)), 'SCOPE'] = 'RWSRPR'
+df.loc[df['Work Class'].str.contains('Fence', na=False), 'SCOPE'] = 'FEN'
+df.loc[df['Work Class'].str.contains('Tenant', na=False), 'SCOPE'] = 'TFN'
+df.loc[df['Work Class'].str.contains('Remodel', na=False), 'SCOPE'] = 'REM'
+df.loc[(df['Work Class'].str.contains('Remodel', na=False)) & (
+    df['Description'].str.contains('finished basement', case=False, na=False)), 'SCOPE'] = 'BFN'
+df.loc[(df['Work Class'].str.contains('Remodel', na=False)) & (
+    df['Description'].str.contains('basement finish', case=False, na=False)), 'SCOPE'] = 'BFN'
+df.loc[(df['Work Class'].str.contains('Remodel', na=False)) & (
+    df['Description'].str.contains('basement remodel', case=False, na=False)), 'SCOPE'] = 'BFN'
+df.loc[(df['Work Class'].str.contains('Remodel', na=False)) & (
+    df['Description'].str.contains('bathroom remodel', case=False, na=False)), 'SCOPE'] = 'BTH'
+df.loc[(df['Work Class'].str.contains('Remodel', na=False)) & (
+    df['Description'].str.contains('bath remodel', case=False, na=False)), 'SCOPE'] = 'BTH'
+df.loc[(df['Work Class'].str.contains('Remodel', na=False)) & (
+    df['Description'].str.contains('tenant', case=False, na=False)), 'SCOPE'] = 'TFN'
+df.loc[df['Work Class'].str.contains('New', na=False), 'SCOPE'] = 'NEW'
+df.loc[(df['Work Class'].str.contains('New', na=False)) & (
+    df['Description'].str.contains('garage built', case=False, na=False)), 'SCOPE'] = 'GAR'
+df.loc[df['Work Class'].str.contains('Addition', na=False), 'SCOPE'] = 'ADD'
+df.loc[(df['Work Class'].str.contains('Addition', na=False)) & (
+    df['Description'].str.contains(' deck', case=False, na=False)), 'SCOPE'] = 'DEC'
+df.loc[(df['Work Class'].str.contains('Addition', na=False)) & (
+    df['Description'].str.contains('new porch', case=False, na=False)), 'SCOPE'] = 'POR'
+df.loc[(df['Work Class'].str.contains('Addition', na=False)) & (
+    df['Description'].str.contains('pergola', case=False, na=False)), 'SCOPE'] = 'POR'
+df.loc[(df['Work Class'].str.contains('Addition', na=False)) & (
+    df['Description'].str.contains(' shed', case=False, na=False)), 'SCOPE'] = 'OUT'
+df.loc[df['Work Class'].str.contains('Addition and', na=False), 'SCOPE'] = 'ADD'
+df.loc[df['Work Class'].str.contains('Wireless', na=False), 'SCOPE'] = 'OTH'
+df.loc[df['Work Class'].str.contains('Demo', na=False), 'SCOPE'] = 'DEM'
+df.loc[df['Work Class'].str.contains('Sign', na=False), 'SCOPE'] = 'SGN'
+df.loc[df['Work Class'].str.contains('Fire', na=False), 'SCOPE'] = 'SPK'
+df.loc[(df['Permit Type'].str.contains('Mobile Home', na=False)) & (
+    df['Description'].str.contains('replacement', case=False, na=False)), 'SCOPE'] = 'MHN'
+df.loc[(df['Permit Type'].str.contains('Mobile Home', na=False)) & (
+    df['Description'].str.contains('new', case=False, na=False)), 'SCOPE'] = 'MHN'
 df.loc[
-    (df['Work Class'].str.contains('Roofing')) & (df['Description'].str.contains('roof', case=False)), 'SCOPE'] = 'RRR'
-df.loc[(df['Work Class'].str.contains('Roofing')) & (
-    df['Description'].str.contains('single', case=False)), 'SCOPE'] = 'RRR'
+    (df['Work Class'].str.contains('Roofing', na=False)) & (df['Description'].str.contains('roof', case=False, na=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing', na=False)) & (
+    df['Description'].str.contains('single', case=False, na=False)), 'SCOPE'] = 'RRR'
 df.loc[
-    (df['Work Class'].str.contains('Roofing')) & (df['Description'].str.contains('SFD', case=False)), 'SCOPE'] = 'RRR'
-df.loc[(df['Work Class'].str.contains('Roofing')) & (
-    df['Description'].str.contains('residential', case=False)), 'SCOPE'] = 'RRR'
+    (df['Work Class'].str.contains('Roofing', na=False)) & (df['Description'].str.contains('SFD', case=False, na=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing', na=False)) & (
+    df['Description'].str.contains('residential', case=False, na=False)), 'SCOPE'] = 'RRR'
 df.loc[
-    (df['Work Class'].str.contains('Roofing')) & (df['Description'].str.contains('multi', case=False)), 'SCOPE'] = 'RRR'
-df.loc[(df['Work Class'].str.contains('Roofing')) & (
-    df['Description'].str.contains('duplex', case=False)), 'SCOPE'] = 'RRR'
-df.loc[(df['Work Class'].str.contains('Roofing')) & (
-    df['Description'].str.contains('re-roof', case=False)), 'SCOPE'] = 'RRR'
-df.loc[(df['Work Class'].str.contains('Roofing')) & (
-    df['Description'].str.contains('re roof', case=False)), 'SCOPE'] = 'RRR'
-df.loc[(df['Work Class'].str.contains('Roofing')) & (
-    df['Description'].str.contains('shingle', case=False)), 'SCOPE'] = 'RRR'
-df.loc[(df['Work Class'].str.contains('Roofing')) & (
-    df['Description'].str.contains('commercial', case=False)), 'SCOPE'] = 'CRR'
+    (df['Work Class'].str.contains('Roofing', na=False)) & (df['Description'].str.contains('multi', case=False, na=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing', na=False)) & (
+    df['Description'].str.contains('duplex', case=False, na=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing', na=False)) & (
+    df['Description'].str.contains('re-roof', case=False, na=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing', na=False)) & (
+    df['Description'].str.contains('re roof', case=False, na=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing', na=False)) & (
+    df['Description'].str.contains('shingle', case=False, na=False)), 'SCOPE'] = 'RRR'
+df.loc[(df['Work Class'].str.contains('Roofing', na=False)) & (
+    df['Description'].str.contains('commercial', case=False, na=False)), 'SCOPE'] = 'CRR'
 
 # creates an Excel file based on blank parcel fields, this is done as an edit check for the COB permit process just to
 # make sure that there's nothing we're missing. Unfortunately, these will most likely need to be manually entered into

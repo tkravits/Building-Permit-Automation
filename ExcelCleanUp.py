@@ -281,17 +281,17 @@ c_str = open('connection_string.txt', 'r').read()  # can be removed once connect
 cnxn = pyodbc.connect(c_str)  # add connection string here
 
 # various SQLs that select from the database
-sql = '''SELECT TOP 200000 parcel.strap, parcel.status_cd, parcel.dor_cd, parcel.nh_cd FROM r_prod.dbo.parcel
+sql = '''SELECT distinct parcel.strap, parcel.status_cd, parcel.dor_cd, parcel.nh_cd FROM r_prod.dbo.parcel
 WHERE (parcel.dor_cd <> 'POSS') AND parcel.status_cd = 'A' '''
 
-sql1 = '''SELECT TOP 200000 folio, strap FROM r_prod.dbo.strap_idx'''
+sql1 = '''SELECT distinct folio, strap FROM r_prod.dbo.strap_idx'''
 
-sql2 = '''SELECT TOP 100000 permit_num FROM r_prod.dbo.permit WHERE permit.agency_id = 'BLD' '''
+sql2 = '''SELECT distinct permit_num FROM r_prod.dbo.permit WHERE permit.agency_id = 'BLD' '''
 
-sql3 = '''SELECT TOP 200000 site.strap, site.str_num, site.str_pfx, site.str, site.str_sfx, site.str_sfx_dir,
+sql3 = '''SELECT distinct site.strap, site.str_num, site.str_pfx, site.str, site.str_sfx, site.str_sfx_dir,
 site.str_unit FROM r_prod.dbo.site WHERE (site.city IN ('BOULDER', 'UNINCORPORATED'))'''
 
-sql4 = '''SELECT parcel.map_id, parcel.nh_cd, parcel.dor_cd, parcel.strap FROM r_prod.dbo.parcel'''
+sql4 = '''SELECT distinct parcel.map_id, parcel.nh_cd, parcel.dor_cd, parcel.strap FROM r_prod.dbo.parcel'''
 
 print('Querying database...\n')
 df_active_acct = pd.read_sql(sql, cnxn)
@@ -306,12 +306,10 @@ df_spread_for_app = pd.read_sql(sql4, cnxn)
 df_permit.rename(columns={'permit_num': 'Permit Number'}, inplace=True)
 df_folio.rename(columns={'folio': "Parcel Number"}, inplace=True)
 
-df1_1 = pd.merge(df, df_permit, on='Permit Number')
-df.set_index('Permit Number', inplace=False)
-df1_1.set_index('Permit Number', inplace=False)
+df_uploaded = pd.merge(df, df_permit, on='Permit Number')
 
 # compares permits that are in CAMA vs ones that aren't, merges df and drops ones that are already in CAMA
-df_not_up = df.loc[~df['Permit Number'].isin(df1_1['Permit Number'])]
+df_not_up = df.loc[~df['Permit Number'].isin(df_uploaded['Permit Number'])]
 df_not_up.drop_duplicates()
 
 print('\n\n----- df_not_up -----\n')
@@ -348,13 +346,15 @@ df_active_addr['Address'] = df_active_addr['str_num'] + df_active_addr['str_pfx'
 df_active_addr['Address'] = df_active_addr['Address'].str.rstrip()
 
 # merges the Boulder accounts database (strap) with the created Address field with the monthly COB permit spreadsheet
-df_permit_addr = df.merge(df_active_addr.drop_duplicates('Address'), how='left', on='Address')
+df_permit_addr = df.merge(df_active_addr, on='Address', how='left')
 
 # takes the unmerged addresses and makes a spreadsheet to be checked by hand
 df_permit_addr_nostrap = df_permit_addr.loc[df_permit_addr['strap'].isna()]
 
 # merging the account number to the permit using the parcel number if the permit did not get successfully merged based
 # on the address
+# TODO - the strap column is accurate, but when the code sets the where statement, it fills in, need to add logic or
+# TODO - merge on the folio # and fill with the strap if merge is succesful
 df_permit_addr['strap_final'] = df_permit_addr['strap'].where(df_permit_addr['strap'].notnull(),
                                                               df_active_addr['strap'])
 
@@ -369,7 +369,7 @@ df_perm_addr_folio.fillna('')
 
 # this is cleaning up the columns to prepare it to be exported for xlsx
 df_final = df_perm_addr_folio.drop(['strap_y', 'strap_x', 'status_cd', 'dor_cd', 'nh_cd'], axis=1)
-df_final.rename(columns={'strap_final': "strap"}, inplace=True)
+#df_final.rename(columns={'strap_final': "strap"}, inplace=True)
 df_final.rename(columns={'str_num': "StreetNo_txt"}, inplace=True)
 df_final['StreetNo_txt'] = df_final['StreetNo_txt'].astype(float)
 df_final.rename(columns={'str_pfx': "StreetDir"}, inplace=True)
@@ -401,7 +401,7 @@ df_final = df_final[["Permit Number", "Parent Permit Number", "strap", "Descript
 # this code can be run again and it will pick up any not uploaded permits at this point
 # During the first run, these two lines are commented out so that it doesn't interfere with the initial upload
 
-df_final = df_final.loc[~df_final['Permit Number'].isin(df1_1['Permit Number'])]
+df_final = df_final.loc[~df_final['Permit Number'].isin(df_uploaded['Permit Number'])]
 df_final.drop_duplicates()
 
 print('\n\n----- df_final (1) -----\n')

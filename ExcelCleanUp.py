@@ -7,6 +7,9 @@ from openpyxl import Workbook
 import glob
 import csv
 
+# TODO - when a CSV, the folio gets truncated which doesn't allow for an accurate merge, converting the csv to xlsx
+# TODO - has fixed this but would like to get CSV to work
+
 # sets the display so that when the code prints, it is readable
 pd.set_option('display.max_rows', 1500)
 pd.set_option('display.max_columns', 50)
@@ -81,8 +84,8 @@ if 'Parent Permit Number' in df:
 elif 'MasterPermitNum' in df:
     df = df.rename(columns={'MasterPermitNum': 'Parent Permit Number'})
 
-
 # remove if starts with
+df = df.dropna(how='all')
 df = df[~df['Parcel Number'].str.contains('BLK', na=False)]
 df = df[~df['Parcel Number'].str.contains('INT', na=False)]
 # remove missing values
@@ -264,14 +267,10 @@ df.loc[(df['Work Class'].str.contains('Roofing', na=False)) & (
 # CAMA, especially if they have some sort of larger value
 
 df_blank = df[df['Parcel Number'].isna()]
-# df_blank.to_excel("Permits_w_no_parcel_num_" + SetDate + '.xlsx')
+# df_blank.to_excel("Permits_w_no_parcel_num_" + SetDate + '.xlsx')# df_blank.to_excel("Permits_w_no_parcel_num_" + SetDate + '.xlsx')
 
 # sets the parcel column type to a string
 df['Parcel Number'] = df['Parcel Number'].astype('str')
-
-# attempting to turn the date field to remove the time component (hours, minutes, sec)
-df['Finaled Date'] = pd.to_datetime(df['Finaled Date'], format='%Y%m%d', errors='coerce')
-pd.to_datetime(df['Issued Date'], format='%Y%m%d', errors='ignore')
 
 # establishes a connection to the permit database
 # TODO - update the connection string before implementation
@@ -353,23 +352,22 @@ df_permit_addr_nostrap = df_permit_addr.loc[df_permit_addr['strap'].isna()]
 
 # merging the account number to the permit using the parcel number if the permit did not get successfully merged based
 # on the address
-# TODO - the strap column is accurate, but when the code sets the where statement, it fills in, need to add logic or
-# TODO - merge on the folio # and fill with the strap if merge is succesful
-df_permit_addr['strap_final'] = df_permit_addr['strap'].where(df_permit_addr['strap'].notnull(),
-                                                              df_active_addr['strap'])
+df_folio['strap'] = df_folio['strap'].str.rstrip()
+df_folio['Parcel Number'] = df_folio['Parcel Number'].str.rstrip()
 
 # merging the final permit spreadsheet with the parcel number data frame
-df_perm_addr_folio = df_permit_addr.merge(df_folio, on='Parcel Number')
+df_permit_addr_folio = df_permit_addr.merge(df_folio, on='Parcel Number')
 
 # this takes the strap from the folio data frame and fills in the strap with the permit/address data frame if the merge
 # couldn't be completed via the address data frame
-df_perm_addr_folio['strap_final'] = df_perm_addr_folio['strap_x'].where(df_perm_addr_folio['strap_x'].notna(),
-                                                                        df_perm_addr_folio['strap_y'])
-df_perm_addr_folio.fillna('')
+
+df_permit_addr_folio['strap_final'] = df_permit_addr_folio['strap_x'].where(df_permit_addr_folio['strap_x'].notnull(),
+                                                                        df_permit_addr_folio['strap_y'])
+df_permit_addr_folio.fillna('')
 
 # this is cleaning up the columns to prepare it to be exported for xlsx
-df_final = df_perm_addr_folio.drop(['strap_y', 'strap_x', 'status_cd', 'dor_cd', 'nh_cd'], axis=1)
-#df_final.rename(columns={'strap_final': "strap"}, inplace=True)
+df_final = df_permit_addr_folio.drop(['strap_y', 'strap_x', 'status_cd', 'dor_cd', 'nh_cd'], axis=1)
+df_final.rename(columns={'strap_final': "strap"}, inplace=True)
 df_final.rename(columns={'str_num': "StreetNo_txt"}, inplace=True)
 df_final['StreetNo_txt'] = df_final['StreetNo_txt'].astype(float)
 df_final.rename(columns={'str_pfx': "StreetDir"}, inplace=True)

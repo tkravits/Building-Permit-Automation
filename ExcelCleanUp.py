@@ -140,7 +140,6 @@ df['SCOPE'] = 'N/A'
 # overwritten by more important codes (ie: OTH is lower, and remodels (REM) are more important and therefore listed
 # towards the end of these)
 
-
 df.loc[df['Work Class'].str.contains('Temporary', case=False, na=False), 'SCOPE'] = 'ELM'
 df.loc[df['Work Class'].str.contains('Construction', case=False, na=False), 'SCOPE'] = 'OTH'
 df.loc[df['Description'].str.contains('RTU', case=False, na=False), 'SCOPE'] = 'HTG'
@@ -317,6 +316,7 @@ print(df_not_up.head(2))
 
 
 # make one df that merges active accounts with the address associated with them
+df_address['strap'] = df_address['strap'].str.rstrip()
 df_active_addr = pd.merge(df_active_acct, df_address, on='strap')
 print('\n\n----- df_active_addr -----\n')
 print(df_active_addr.head(2))

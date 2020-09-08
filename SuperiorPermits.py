@@ -37,6 +37,7 @@ df['Date'] = pd.to_datetime(df.iloc[:,0], errors='coerce')
 df = df.dropna(subset=['Date'])
 
 df['Permit Number'] = pd.DataFrame(df.iloc[:,1])
+df['Permit Number'] = df['Permit Number'].astype('str').str.rstrip()
 df['Permit Applicant'] = pd.DataFrame(df.iloc[:,2])
 df['Address'] = pd.DataFrame(df.iloc[:,3])
 df['Address'] = df['Address'].str.upper()
@@ -111,7 +112,7 @@ df.loc[(df['Description'].str.contains('Roofing', na=False)) & (
 
 print('Establishing connection...\n')
 c_str = open('connection_string.txt', 'r').read()  # can be removed once connection string is added
-cnxn = pyodbc.connect(c_str)
+cnxn = pyodbc.connect('c_str')
 
 sql = '''SELECT distinct parcel.strap, parcel.status_cd, parcel.dor_cd, parcel.nh_cd FROM r_prod.dbo.parcel
 WHERE (parcel.dor_cd <> 'POSS') AND parcel.status_cd = 'A' '''
@@ -135,12 +136,13 @@ df_permit.rename(columns={'permit_num': 'Permit Number'}, inplace=True)
 
 df_uploaded = pd.merge(df, df_permit, on='Permit Number')
 
-# compares permits that are in CAMA vs ones that aren't, merges df and drops ones that are already in CAMA
-df_not_up = df.loc[~df['Permit Number'].isin(df_uploaded['Permit Number'])]
-df_not_up.drop_duplicates()
+# a simple way to check to see if an already uploaded permit is in CAMA, it's checked in an earlier line,
+# but if for some reason the CAMA permit upload system doesn't upload the permit successfully,
+# this code can be run again and it will pick up any not uploaded permits at this point
+# During the first run, these two lines are commented out so that it doesn't interfere with the initial upload
 
-print('\n\n----- df_not_up -----\n')
-print(df_not_up.head(5))
+df = df.loc[~df['Permit Number'].isin(df_uploaded['Permit Number'])]
+df.drop_duplicates()
 
 # make one df that merges active accounts with the address associated with them
 df_active_addr = pd.merge(df_active_acct, df_address, on='strap')
@@ -180,7 +182,29 @@ df_permit_addr_nostrap.to_excel('Unmerged_superior_permits.xlsx', index=False)
 df_final = df_permit_addr.drop(['status_cd', 'dor_cd', 'nh_cd'], axis=1)
 df_final['strap'] = df_final['strap'].str.rstrip()
 df_final.drop_duplicates(subset='Permit Number', keep='first', inplace=True)
-df_final.dropna(subset=['strap'])
 
-df_final = df_permit_addr[["Permit Number", "strap", "Description", "str_num", "str_pfx",
+df_final = df_final[["Permit Number", "strap", "Description", "str_num", "str_pfx",
                      "str", "str_sfx", "str_unit", "Value Total", "Date", "SCOPE"]]
+
+df_final = df_final.dropna(subset=['strap'])
+
+# spreadsheet for app.
+df_spread_for_app['strap'] = df_spread_for_app['strap'].str.rstrip()
+df_final = pd.merge(df_final, df_spread_for_app, on='strap')
+df_final.to_excel(SetDate + "_permits_Appraiser.xlsx", index=False)
+
+# export final data to a txt file to be imported
+header = ''  # first, create the header
+for s in list(df_final):
+    header += '"' + s + '"|'
+header = header[:-1]  # to take the final | off, as it's unnecessary
+# take the values of each column and add double quotes
+df_final.update(df_final[["Permit Number", "strap", "Description", "str_num", "str_pfx",
+                     "str", "str_sfx", "str_unit", "Value Total", "Date", "SCOPE"]].applymap('"{}"'.format))
+
+print('\n\n----- df_final (2) -----\n')
+print(df_final.head(2))
+# print preview
+
+# now, save to a text file with a | separator
+np.savetxt(SetDate + '_Superior_permits.txt', df_final.values, fmt='%s', header=header, comments='', delimiter='|')

@@ -99,11 +99,8 @@ df_review.to_excel("Permits_In_Review_" + SetDate + '.xlsx')
 
 # removes Pending, Void, In Review, Withdrawn, Approved for permits in the Status. We only want permits that
 # either have been issued or are already completed since permit value and other areas can change.
-df = df[~df['Status'].str.contains('Pending', na=False)]
-df = df[~df['Status'].str.contains('Void', na=False)]
-df = df[~df['Status'].str.contains('In Review', na=False)]
-df = df[~df['Status'].str.contains('Withdrawn', na=False)]
-df = df[~df['Status'].str.contains('Approved for', na=False)]
+
+df = df[df['Status'].str.contains('Issued|Letter|Certificate|Closed', na=False)]
 
 # removes *, ", and carriage returns
 df['Description'].replace(regex=True, inplace=True, to_replace=r'\*', value=r'')
@@ -272,8 +269,6 @@ df_blank = df[df['Parcel Number'].isna()]
 df['Parcel Number'] = df['Parcel Number'].astype('str')
 
 # establishes a connection to the permit database
-# TODO - update the connection string before implementation
-#  --better to keep it separate? easier access?
 print('Establishing connection...\n')
 c_str = open('connection_string.txt', 'r').read()  # can be removed once connection string is added
 cnxn = pyodbc.connect(c_str)  # add connection string here
@@ -383,7 +378,7 @@ df_final['StreetDir'] = df_final['StreetDir'].fillna('')
 df_final = pd.merge(df_final, df_address, on='strap')
 df_final['strap'] = df_final['strap'].str.rstrip()
 df_final.drop_duplicates(subset='Permit Number', keep='first', inplace=True)
-df_final['StreetNo_txt'] = df_final['StreetNo_txt'].where(df_final['StreetNo_txt'].notna(), df_final['str_num'])
+df_final['StreetNo_txt'] = df_final['StreetNo_txt'].where(df_final['StreetNo_txt'].notna(), df_final['str_num']).astype(int)
 df_final['StreetDir'] = df_final['StreetDir'].where(df_final['StreetDir'].notna(), df_final['str_pfx'])
 df_final['StreetName'] = df_final['StreetName'].where(df_final['StreetName'].notna(), df_final['str'])
 df_final['StreetType'] = df_final['StreetType'].where(df_final['StreetType'].notna(), df_final['str_sfx'])

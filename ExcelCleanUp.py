@@ -16,8 +16,7 @@ pd.set_option('display.max_columns', 50)
 pd.set_option('display.width', 1500)
 
 # set the time for exported excel spreadsheets
-CurrentDate = pd.Timestamp.today()
-SetDate = (CurrentDate - pd.DateOffset(months=1)).strftime("%B%Y")
+CurrentDate = pd.Timestamp.today().strftime("%B%Y")
 
 # imports the permit sheet to be cleaned up
 print('Opening file window...\n')
@@ -95,7 +94,7 @@ df = df[~df['Work Class'].str.contains('Information', na=False)]
 df = df[~df['Work Class'].str.contains('Temporary Event', na=False)]
 
 # these are the permits that are in review (aren't uploaded to cama)
-df_review.to_excel("Permits_In_Review_" + SetDate + '.xlsx')
+df_review.to_excel("Permits_In_Review_from" + CurrentDate + '.xlsx')
 
 # removes Pending, Void, In Review, Withdrawn, Approved for permits in the Status. We only want permits that
 # either have been issued or are already completed since permit value and other areas can change.
@@ -312,6 +311,7 @@ print(df_not_up.head(2))
 
 # make one df that merges active accounts with the address associated with them
 df_address['strap'] = df_address['strap'].str.rstrip()
+df_active_acct['strap'] = df_active_acct['strap'].str.rstrip()
 df_active_addr = pd.merge(df_active_acct, df_address, on='strap')
 print('\n\n----- df_active_addr -----\n')
 print(df_active_addr.head(2))
@@ -406,7 +406,9 @@ df_final = df_final.fillna('')
 # spreadsheet for app.
 df_spread_for_app['strap'] = df_spread_for_app['strap'].str.rstrip()
 df_final = pd.merge(df_final, df_spread_for_app, on='strap')
-df_final.to_excel(SetDate + "_permits_Appraiser.xlsx", index=False)
+
+print('Please name the spreadsheet to be send to the appraisers')
+df_final.to_excel(input() + ".xlsx", index=False)
 
 # remove map_id, nh_cd, and dor_cd from the text file
 df_final = df_final.drop(['map_id', 'nh_cd', 'dor_cd'], axis=1)
@@ -426,4 +428,5 @@ print(df_final.head(2))
 # print preview
 
 # now, save to a text file with a | separator
-np.savetxt(SetDate + '_permits.txt', df_final.values, fmt='%s', header=header, comments='', delimiter='|')
+print("Please name the txt file that will be uploaded to CAMA")
+np.savetxt(input() + '.txt', df_final.values, fmt='%s', header=header, comments='', delimiter='|')

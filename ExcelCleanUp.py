@@ -83,6 +83,10 @@ if 'Parent Permit Number' in df:
 elif 'MasterPermitNum' in df:
     df = df.rename(columns={'MasterPermitNum': 'Parent Permit Number'})
 
+# create an input to select the earliest date the user wants to upload
+print('Please input the earilest date you would like (ex: 09/26/2020)')
+df = df[df['AppliedDate'] > input()]
+
 # remove if starts with
 df = df.dropna(how='all')
 df = df[~df['Parcel Number'].str.contains('BLK', na=False)]
@@ -100,6 +104,7 @@ df_review.to_excel("Permits_In_Review_from" + CurrentDate + '.xlsx')
 # either have been issued or are already completed since permit value and other areas can change.
 
 df = df[df['Status'].str.contains('Issued|Letter|Certificate|Closed', na=False)]
+df = df[df['Issued Date'].notna()]
 
 # removes *, ", and carriage returns
 df['Description'].replace(regex=True, inplace=True, to_replace=r'\*', value=r'')

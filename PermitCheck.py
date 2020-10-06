@@ -77,6 +77,10 @@ if 'Parent Permit Number' in df:
 elif 'MasterPermitNum' in df:
     df = df.rename(columns={'MasterPermitNum': 'Parent Permit Number'})
 
+# create an input to select the earliest date the user wants to upload
+print('Please input the earilest date you would like (ex: 09/26/2020)')
+df = df[df['AppliedDate'] > input()]
+
 # remove if starts with
 df = df.dropna(how='all')
 df = df[~df['Parcel Number'].str.contains('BLK', na=False)]
@@ -89,11 +93,8 @@ df = df[~df['Work Class'].str.contains('Temporary Event', na=False)]
 
 # removes Pending, Void, In Review, Withdrawn, Approved for permits in the Status. We only want permits that
 # either have been issued or are already completed since permit value and other areas can change.
-df = df[~df['Status'].str.contains('Pending', na=False)]
-df = df[~df['Status'].str.contains('Void', na=False)]
-df = df[~df['Status'].str.contains('In Review', na=False)]
-df = df[~df['Status'].str.contains('Withdrawn', na=False)]
-df = df[~df['Status'].str.contains('Approved for', na=False)]
+df = df[df['Status'].str.contains('Issued|Letter|Certificate|Closed', na=False)]
+df = df[df['Issued Date'].notna()]
 
 # sets the parcel column type to a string
 df['Parcel Number'] = df['Parcel Number'].astype('str')
@@ -123,4 +124,4 @@ df_not_up.drop_duplicates()
 print('\n\n----- df_not_up -----\n')
 print(df_not_up.head)
 
-#df_not_up.to_excel("Permits_Not_Uploaded.xlsx", index=False)
+df_not_up.to_excel("Permits_Not_Uploaded.xlsx", index=False)

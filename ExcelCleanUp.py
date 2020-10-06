@@ -309,18 +309,10 @@ df_uploaded = pd.merge(df, df_permit, on='Permit Number')
 df_not_up = df.loc[~df['Permit Number'].isin(df_uploaded['Permit Number'])]
 df_not_up.drop_duplicates()
 
-print('\n\n----- df_not_up -----\n')
-print(df_not_up.head(2))
-# print preview
-
-
 # make one df that merges active accounts with the address associated with them
 df_address['strap'] = df_address['strap'].str.rstrip()
 df_active_acct['strap'] = df_active_acct['strap'].str.rstrip()
 df_active_addr = pd.merge(df_active_acct, df_address, on='strap')
-print('\n\n----- df_active_addr -----\n')
-print(df_active_addr.head(2))
-# print preview
 
 # attempting to take situs address, concat, and compare with the Boulder permit address (only using active accts, no
 # possessory interest)
@@ -343,6 +335,7 @@ df_active_addr['str_unit'] = df_active_addr['str_unit'].fillna(np.nan).replace(n
 df_active_addr['Address'] = df_active_addr['str_num'] + df_active_addr['str_pfx'] + df_active_addr['str'] + \
                             ' ' + df_active_addr['str_sfx'] + df_active_addr['str_sfx_dir'] + df_active_addr['str_unit']
 df_active_addr['Address'] = df_active_addr['Address'].str.rstrip()
+df_active_addr = df_active_addr.replace('\s+', ' ', regex=True)
 
 # merges the Boulder accounts database (strap) with the created Address field with the monthly COB permit spreadsheet
 df_permit_addr = df.merge(df_active_addr, on='Address', how='left')
@@ -402,17 +395,13 @@ df_final = df_final[["Permit Number", "Parent Permit Number", "strap", "Descript
 df_final = df_final.loc[~df_final['Permit Number'].isin(df_uploaded['Permit Number'])]
 df_final.drop_duplicates()
 
-print('\n\n----- df_final (1) -----\n')
-print(df_final.head(2))
-# print preview
-
 df_final = df_final.fillna('')
 
 # spreadsheet for app.
 df_spread_for_app['strap'] = df_spread_for_app['strap'].str.rstrip()
 df_final = pd.merge(df_final, df_spread_for_app, on='strap')
 
-print('Please name the spreadsheet to be send to the appraisers')
+print('Please name the spreadsheet to be sent to the appraisers')
 df_final.to_excel(input() + ".xlsx", index=False)
 
 # remove map_id, nh_cd, and dor_cd from the text file
@@ -428,9 +417,6 @@ df_final.update(df_final[["Permit Number", "Parent Permit Number", "strap", "Des
                           "StreetName", "StreetType", "Unit", "Value Total", "Issued Date", "Finaled Date",
                           "Work Class", "SCOPE"]].applymap('"{}"'.format))
 
-print('\n\n----- df_final (2) -----\n')
-print(df_final.head(2))
-# print preview
 
 # now, save to a text file with a | separator
 print("Please name the txt file that will be uploaded to CAMA")

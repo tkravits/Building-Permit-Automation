@@ -11,7 +11,7 @@ This is an example of the dataset
 
 |PermitNum |	MasterPermitNum	|Description |	AppliedDate |	IssuedDate |	CompletedDate	| StatusCurrent	| OriginalAddress	|OriginalCity	|OriginalState	|OriginalZip	|PIN	|ProjectName	|PermitType|	PermitWorkType	|EstProjectCost |
 | --- | --- | ---| --- | --- | ---| --- | --- | ---| --- | --- | ---| --- | --- | ---| --- |
-|BLD-NRE2020-00152	| - |	"*UNIT 200: ALL INTERIOR WORK |	06/20/20| 07/01/20| | | |Pending at Applicant |	4845 PEARL EAST CIR|	BOULDER|	CO|	80301|	1.46328E+11	|	Building Permit - Non-Residential	Remodel|	85533|
+|BLD-NRE2020-00152	| - |	"*UNIT 200: ALL INTERIOR WORK |	06/20/20| 07/01/20| |Pending at Applicant |	4845 PEARL EAST CIR|	BOULDER|	CO|	80301|	1.46328E+11	|	Building Permit - Non-Residential	Remodel|	85533|
 
 |BLD-SFD2020-00435|		*Remove old deck (75sq ft), and install a new deck (273 sq ft).	10/5/2020	|		Pending at Applicant	|1929 HARDSCRABBLE DR	|BOULDER	|CO	|80305|	1.57717E+11	|	Building Permit - Single Family Detached Dwelling	Addition	|4781.7|
 

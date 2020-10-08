@@ -14,8 +14,8 @@ The result it three output files: an excel sheet with the permits are being revi
 
 |Permit Number|	Parent Permit Number|	strap|	Description|	StreetNo_txt|	StreetDir|	StreetName|	StreetType|	Unit|	Value Total|	Issued Date|	Finaled Date|	Work Class|	SCOPE|	map_id|	nh_cd|	dor_cd|
 | --- | --- | ---| --- | --- | ---| --- | --- | ---| --- | --- | ---| --- | --- | ---| --- |--- |
-|RFG2020-00745| |		R0111113	|Total tear-off & reroof of SFD, 34 squares of dimensional shingles |	1558	| 	CRESS	|CT	|	9000	|2020-09-30 00:00:00|		Roofing Replacement Permit	|RRR	|	120	|RES|
-|RFG2020-00746	||	R0007293	|Total tear-off & reroof of SFD, 23 squares of dimensional shingles| 	1775	| 	FOREST|	AVE|		10270|	2020-09-29 00:00:00	|	Roofing Replacement Permit|	RRR	|	115	|RES|
+|RFG2020-00745| |		R0111113	|Total tear-off & reroof of SFD, 34 squares of dimensional shingles |	1558	|| 	CRESS	|CT	||	9000	|2020-09-30 00:00:00|		Roofing Replacement Permit	|RRR	|	120	|RES|
+|RFG2020-00746	||	R0007293	|Total tear-off & reroof of SFD, 23 squares of dimensional shingles| 	1775	|| 	FOREST|	AVE||		10270|	2020-09-29 00:00:00	|	Roofing Replacement Permit|	RRR	|	115	|RES|
 
 
 a text file in the correct format to be pulled into a CAMA database, and an excel sheet summarizing the information for the appraisers.

@@ -443,21 +443,22 @@ def address_merge(df):
     df = df.merge(longmont_address, on='Address', how='left')
     df.drop(columns=['Parcel Number_y'])
     df = df.rename(columns={'Parcel Number_x': 'Parcel Number'})
-    folio = df.merge(longmont_address, on='Parcel Number')
+    folio = df.merge(longmont_address, on='Parcel Number', how='left')
     folio['strap_final'] = folio['strap_x'].where(
         folio['strap_x'].notnull(), folio['strap_y'])
     folio = folio.drop_duplicates(subset=['Description'], keep='last')
 
     # takes the unmerged addresses and makes a spreadsheet to be checked by hand
-    df_unmerged_addresses = df.loc[df['strap'].isna()]
-    #df_unmerged_addresses.to_excel('HandEnter_Longmont_permits.xlsx', index=False)
+    df_unmerged_addresses = folio.loc[folio['strap_final'].isna()]
+    df_unmerged_addresses.to_excel('HandEnter_Longmont_permits_12_16.xlsx', index=False)
 
     return df, folio, df_unmerged_addresses
 
 
 df, folio, df_unmerged_addresses = address_merge(df)
 
-#
+# TODO - There's 1+ more permit numbers when comparing df to folio + uploaded + unmerged
+
 # df_final = df_permit_addr.drop(['status_cd', 'dor_cd', 'nh_cd'], axis=1)
 # df_final['strap'] = df_final['strap'].str.rstrip()
 # df_final.drop_duplicates(subset='Permit Number', keep='first', inplace=True)

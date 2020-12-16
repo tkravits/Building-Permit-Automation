@@ -52,9 +52,12 @@ elif not filename.endswith(('.xls', '.xlsx', '.csv', '.dbf')):
 print('Data loading...\n')
 
 
-def Spreadsheet_formater(df):
+def spreadsheet_formatter(df):
     if 'PIN' in df.columns:
         df = df.rename(columns={'PIN': 'Parcel Number'})  # else if named pin, rename it
+
+    if 'Parcel' in df.columns:
+        df = df.rename(columns={'Parcel': 'Parcel Number'})
 
     if 'OriginalAddress' in df.columns:
         df = df.rename(columns={'OriginalAddress': 'Address'})
@@ -124,7 +127,7 @@ def issued_date_filter(df):
     return df
 
 
-def permit_classifier(df):
+def longmont_permit_classifier(df):
     if 'Description' in df.columns:
         # Classifies the description into a format that CAMA can understand
         df.loc[df['Work Class'].str.contains('Temporary', case=False, na=False), 'SCOPE'] = 'ELM'
@@ -355,83 +358,112 @@ def permit_classifier(df):
     return df
 
 
-df = Spreadsheet_formater(df)
-df = issued_date_filter(df)
-df = permit_classifier(df)
+# Run the spreadsheet formatter
+df = spreadsheet_formatter(df)
 
-#
-# print('Establishing connection...\n')
-# c_str = open('connection_string.txt', 'r').read()  # can be removed once connection string is added
-# cnxn = pyodbc.connect(c_str)
-#
-# sql = '''SELECT distinct parcel.strap, parcel.status_cd, parcel.dor_cd, parcel.nh_cd FROM r_prod.dbo.parcel
-# WHERE (parcel.dor_cd <> 'POSS') AND parcel.status_cd = 'A' '''
-#
-# sql2 = '''SELECT distinct permit_num FROM r_prod.dbo.permit'''
-#
-# sql3 = '''SELECT distinct site.strap, site.str_num, site.str_pfx, site.str, site.str_sfx, site.str_sfx_dir,
-# site.str_unit FROM r_prod.dbo.site WHERE (site.city IN ('LONGMONT', 'UNINCORPORATED'))'''
-#
-# sql4 = '''SELECT distinct parcel.map_id, parcel.nh_cd, parcel.dor_cd, parcel.strap FROM r_prod.dbo.parcel'''
-#
-# df_active_acct = pd.read_sql(sql, cnxn)
-# df_permit = pd.read_sql(sql2, cnxn)
-# df_address = pd.read_sql(sql3, cnxn)
-# df_spread_for_app = pd.read_sql(sql4, cnxn)
-#
-# # Takes the permit database, renames the column to Permit Number, and then merges the month's permit with permits found
-# # in the database, this makes sure a permit is not double uploaded, or double valuing
-#
-# df_permit.rename(columns={'permit_num': 'Permit Number'}, inplace=True)
-#
-# df_uploaded = pd.merge(df, df_permit, on='Permit Number')
-#
-# # a simple way to check to see if an already uploaded permit is in CAMA, it's checked in an earlier line,
-# # but if for some reason the CAMA permit upload system doesn't upload the permit successfully,
-# # this code can be run again and it will pick up any not uploaded permits at this point
-# # During the first run, these two lines are commented out so that it doesn't interfere with the initial upload
-#
-# df = df.loc[~df['Permit Number'].isin(df_uploaded['Permit Number'])]
-# df.drop_duplicates()
-#
-# # make one df that merges active accounts with the address associated with them
-# df_active_addr = pd.merge(df_active_acct, df_address, on='strap')
-#
-# # attempting to take situs address, concat, and compare with the Boulder permit address (only using active accts, no
-# # possessory interest)
-#
-# df_active_addr.dropna(subset=['str_num'])
-# df_active_addr['str_num'] = df_active_addr['str_num'].astype(int).astype(str)
-# df_active_addr['str_pfx'] = df_active_addr['str_pfx'].fillna(np.nan).replace(np.nan, ' ', regex=True)
-# df_active_addr['str_pfx'] = df_active_addr['str_pfx'].replace('  ', ' ', regex=True)
-# df_active_addr['str_pfx'] = df_active_addr['str_pfx'].replace('S', ' S', regex=True)
-# df_active_addr['str_pfx'] = df_active_addr['str_pfx'].replace('N', ' N', regex=True)
-# df_active_addr['str_pfx'] = df_active_addr['str_pfx'].replace('E', ' E', regex=True)
-# df_active_addr['str_pfx'] = df_active_addr['str_pfx'].replace('W', ' W', regex=True)
-# df_active_addr['str_sfx'] = df_active_addr['str_sfx'].fillna(np.nan).replace(np.nan, ' ', regex=True)
-# df_active_addr['str_sfx'] = df_active_addr['str_sfx'].replace('  ', '', regex=True)
-# df_active_addr['str_sfx_dir'] = df_active_addr['str_sfx_dir'].fillna(np.nan).replace(np.nan, ' ', regex=True)
-# df_active_addr['str_sfx_dir'] = df_active_addr['str_sfx_dir'].replace('  ', ' ', regex=True)
-# df_active_addr['str_unit'] = df_active_addr['str_unit'].fillna(np.nan).replace(np.nan, '', regex=True)
-#
-# # creates a column called Address that is set up in the same format as the Superior permits table
-# df_active_addr['Address'] = df_active_addr['str_num'] + df_active_addr['str_pfx'] + df_active_addr['str'] + \
-#                             ' ' + df_active_addr['str_sfx'] + df_active_addr['str_sfx_dir'] + df_active_addr['str_unit']
-# df_active_addr['Address'] = df_active_addr['Address'].str.rstrip()
-#
-# # merges the Superior accounts database (strap) with the created Address field with the Superior permit spreadsheet
-# df_permit_addr = df.merge(df_active_addr, on='Address', how='left')
-#
-# # takes the unmerged addresses and makes a spreadsheet to be checked by hand
-# df_permit_addr_nostrap = df_permit_addr.loc[df_permit_addr['strap'].isna()]
-# df_permit_addr_nostrap.to_excel('HandEnter_Longmont_permits.xlsx', index=False)
+# Run issued date function
+df = issued_date_filter(df)
+
+# Run the permit classifier function
+df = longmont_permit_classifier(df)
+
+
+def db_connection(df):
+    print('Establishing connection...\n')
+    c_str = open('connection_string.txt', 'r').read()  # can be removed once connection string is added
+    cnxn = pyodbc.connect(c_str)
+
+    longmont_sql = '''SELECT distinct parcel.strap, strap_idx.folio, parcel.status_cd, parcel.dor_cd, parcel.nh_cd, 
+    parcel.map_id, site.str_num, site.str_pfx, site.str, site.str_sfx, site.str_sfx_dir, site.str_unit
+	FROM r_prod.dbo.parcel
+    INNER JOIN r_prod.dbo.site ON parcel.strap = site.strap
+    INNER JOIN r_prod.dbo.strap_idx ON parcel.strap = strap_idx.strap
+    WHERE (parcel.dor_cd <> 'POSS') AND parcel.status_cd = 'A'
+    AND (site.city IN ('LONGMONT', 'UNINCORPORATED')) '''
+
+    permit_sql = '''SELECT distinct permit_num FROM r_prod.dbo.permit'''
+
+    longmont_sql_df = pd.read_sql(longmont_sql, cnxn)
+    permit_sql_df = pd.read_sql(permit_sql, cnxn)
+
+    # Takes the permit database, renames the column to Permit Number, and then merges the month's permit with permits found
+    # in the database, this makes sure a permit is not double uploaded, or double valuing
+
+    permit_sql_df.rename(columns={'permit_num': 'Permit Number'}, inplace=True)
+    longmont_sql_df.rename(columns={'folio': 'Parcel Number'}, inplace=True)
+    longmont_sql_df['strap'] = longmont_sql_df['strap'].str.rstrip()
+
+    return permit_sql_df, longmont_sql_df
+
+
+# Create two df, one containing all building permits and one containing all Longmont addresses w/straps
+permit, longmont_address = db_connection(df)
+
+# Merge the queried building permits with the ones already uploaded in CAMA
+df_uploaded = pd.merge(df, permit, on='Permit Number')
+
+# Check to see if an already uploaded permit is in CAMA
+df = df.loc[~df['Permit Number'].isin(df_uploaded['Permit Number'])]
+df.drop_duplicates()
+
+
+def longmont_address_format(df):
+    # attempting to take our situs address, concat, and compare with the city's permit address
+    # (only using active accts, no possessory interest)
+    df.dropna(subset=['str_num'])
+    df['str_num'] = df['str_num'].astype(int).astype(str)
+    df['str_pfx'] = df['str_pfx'].fillna(np.nan).replace(np.nan, ' ', regex=True)
+    df['str_pfx'] = df['str_pfx'].replace('  ', ' ', regex=True)
+    df['str_pfx'] = df['str_pfx'].replace('S', ' S', regex=True)
+    df['str_pfx'] = df['str_pfx'].replace('N', ' N', regex=True)
+    df['str_pfx'] = df['str_pfx'].replace('E', ' E', regex=True)
+    df['str_pfx'] = df['str_pfx'].replace('W', ' W', regex=True)
+    df['str_sfx'] = df['str_sfx'].fillna(np.nan).replace(np.nan, ' ', regex=True)
+    df['str_sfx'] = df['str_sfx'].replace('  ', '', regex=True)
+    df['str_sfx'] = df['str_sfx'].replace('WAY', 'WY', regex=True)
+    df['str_sfx_dir'] = df['str_sfx_dir'].fillna(np.nan).replace(np.nan, ' ', regex=True)
+    df['str_sfx_dir'] = df['str_sfx_dir'].replace('  ', ' ', regex=True)
+    df['str_unit'] = df['str_unit'].fillna(np.nan).replace(np.nan, '', regex=True)
+
+    # creates a column called Address that is set up in the same format as the Superior permits table
+    df['Address'] = df['str_num'] + df['str_pfx'] + df['str'] + ' ' \
+                    + df['str_sfx'] + df['str_sfx_dir'] + df['str_unit']
+    df['Address'] = df['Address'].str.rstrip()
+
+    return df
+
+
+longmont_address = longmont_address_format(longmont_address)
+
+def address_merge(df):
+    # merges the CAMA accounts database (strap) with the created Address field with the city's permit spreadsheet
+    df['Address'] = df['Address'].str.replace(' UNIT ', ' ')
+    df['Address'] = df['Address'].str.replace(' STE ', ' ')
+    df['Address'] = df['Address'].str.replace(' MB ', ' ')
+    df = df.merge(longmont_address, on='Address', how='left')
+    df.drop(columns=['Parcel Number_y'])
+    df = df.rename(columns={'Parcel Number_x': 'Parcel Number'})
+    folio = df.merge(longmont_address, on='Parcel Number')
+    folio['strap_final'] = folio['strap_x'].where(
+        folio['strap_x'].notnull(), folio['strap_y'])
+    folio = folio.drop_duplicates(subset=['Description'], keep='last')
+
+    # takes the unmerged addresses and makes a spreadsheet to be checked by hand
+    df_unmerged_addresses = df.loc[df['strap'].isna()]
+    #df_unmerged_addresses.to_excel('HandEnter_Longmont_permits.xlsx', index=False)
+
+    return df, folio, df_unmerged_addresses
+
+
+df, folio, df_unmerged_addresses = address_merge(df)
+
 #
 # df_final = df_permit_addr.drop(['status_cd', 'dor_cd', 'nh_cd'], axis=1)
 # df_final['strap'] = df_final['strap'].str.rstrip()
 # df_final.drop_duplicates(subset='Permit Number', keep='first', inplace=True)
 #
 # df_final = df_final[["Permit Number", "strap", "Description", "str_num", "str_pfx",
-#                      "str", "str_sfx", "str_unit", "Value Total", "Date", "SCOPE"]]
+#                      "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]]
 #
 # df_final = df_final.dropna(subset=['strap'])
 #
@@ -448,7 +480,7 @@ df = permit_classifier(df)
 # header = header[:-1]  # to take the final | off, as it's unnecessary
 # # take the values of each column and add double quotes
 # df_final.update(df_final[["Permit Number", "strap", "Description", "str_num", "str_pfx",
-#                      "str", "str_sfx", "str_unit", "Value Total", "Date", "SCOPE"]].applymap('"{}"'.format))
+#                           "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]].applymap('"{}"'.format))
 #
 # # now, save to a text file with a | separator
 # print("Please name the txt file that will be uploaded to CAMA")

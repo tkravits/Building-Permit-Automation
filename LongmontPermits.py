@@ -9,7 +9,7 @@ import csv
 from dbfread import DBF
 from pandas import DataFrame
 
-# TODO - when a CSV, the folio gets truncated which doesn't allow for an accurate merge, converting the csv to xlsx
+# TODO - when a CSV, the df_merge_perm gets truncated which doesn't allow for an accurate merge, converting the csv to xlsx
 # TODO - has fixed this but would like to get CSV to work
 
 # sets the display so that when the code prints, it is readable
@@ -435,7 +435,8 @@ def longmont_address_format(df):
 
 longmont_address = longmont_address_format(longmont_address)
 
-def address_merge(df):
+
+def address_and_parcel_merge(df):
     # merges the CAMA accounts database (strap) with the created Address field with the city's permit spreadsheet
     df['Address'] = df['Address'].str.replace(' UNIT ', ' ')
     df['Address'] = df['Address'].str.replace(' STE ', ' ')
@@ -443,46 +444,56 @@ def address_merge(df):
     df = df.merge(longmont_address, on='Address', how='left')
     df.drop(columns=['Parcel Number_y'])
     df = df.rename(columns={'Parcel Number_x': 'Parcel Number'})
-    folio = df.merge(longmont_address, on='Parcel Number', how='left')
-    folio['strap_final'] = folio['strap_x'].where(
-        folio['strap_x'].notnull(), folio['strap_y'])
-    folio = folio.drop_duplicates(subset=['Description'], keep='last')
+    df_merge_perm = df.merge(longmont_address, on='Parcel Number', how='left')
+    df_merge_perm['strap_final'] = df_merge_perm['strap_x'].where(
+         df_merge_perm['strap_x'].notnull(), df_merge_perm['strap_y'])
+    df_merge_perm.drop_duplicates(subset=['Permit Number'], keep='last', inplace=True)
 
     # takes the unmerged addresses and makes a spreadsheet to be checked by hand
-    df_unmerged_addresses = folio.loc[folio['strap_final'].isna()]
+    df_unmerged_addresses = df_merge_perm.loc[df_merge_perm['strap_final'].isna()]
+    df_merge_perm.dropna(subset=['strap_final'], inplace=True)
     df_unmerged_addresses.to_excel('HandEnter_Longmont_permits_12_16.xlsx', index=False)
 
-    return df, folio, df_unmerged_addresses
+    return df, df_merge_perm, df_unmerged_addresses
 
 
-df, folio, df_unmerged_addresses = address_merge(df)
+df, df_merge_perm, df_unmerged_addresses = address_and_parcel_merge(df)
 
-# TODO - There's 1+ more permit numbers when comparing df to folio + uploaded + unmerged
+def final_cleanup_and_export(df):
+    df['strap'] = df['strap_final'].str.rstrip()
+    df.rename(columns={'nh_cd_y': 'nh_cd'}, inplace=True)
+    df.rename(columns={'dor_cd_y': 'dor_cd'}, inplace=True)
+    df.rename(columns={'map_id_y': 'map_id'}, inplace=True)
+    df.rename(columns={'str_num_y': 'str_num'}, inplace=True)
+    df.rename(columns={'str_pfx_y': 'str_pfx'}, inplace=True)
+    df.rename(columns={'str_y': 'str'}, inplace=True)
+    df.rename(columns={'str_sfx_y': 'str_sfx'}, inplace=True)
+    df.rename(columns={'str_unit_y': 'str_unit'}, inplace=True)
+    # create spreadsheet for app.
+    print('Please name the exported spreadsheet for the Appraiser staff')
+    df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
+             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE",
+             "nh_cd", "dor_cd", "map_id"]]
 
-# df_final = df_permit_addr.drop(['status_cd', 'dor_cd', 'nh_cd'], axis=1)
-# df_final['strap'] = df_final['strap'].str.rstrip()
-# df_final.drop_duplicates(subset='Permit Number', keep='first', inplace=True)
-#
-# df_final = df_final[["Permit Number", "strap", "Description", "str_num", "str_pfx",
-#                      "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]]
-#
-# df_final = df_final.dropna(subset=['strap'])
-#
-# # spreadsheet for app.
-# df_spread_for_app['strap'] = df_spread_for_app['strap'].str.rstrip()
-# df_final = pd.merge(df_final, df_spread_for_app, on='strap')
-# print('Please name the exported spreadsheet for the Appraiser staff')
-# df_final.to_excel(input() + "_LongmontPermits_Appraiser.xlsx", index=False)
-#
-# # export final data to a txt file to be imported
-# header = ''  # first, create the header
-# for s in list(df_final):
-#     header += '"' + s + '"|'
-# header = header[:-1]  # to take the final | off, as it's unnecessary
-# # take the values of each column and add double quotes
-# df_final.update(df_final[["Permit Number", "strap", "Description", "str_num", "str_pfx",
-#                           "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]].applymap('"{}"'.format))
-#
-# # now, save to a text file with a | separator
-# print("Please name the txt file that will be uploaded to CAMA")
-# np.savetxt(input() + '.txt', df_final.values, fmt='%s', header=header, comments='', delimiter='|')
+    df.to_excel(input() + "_LongmontPermits_Appraiser.xlsx", index=False)
+
+    df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
+                         "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]]
+
+    # export final data to a txt file to be imported
+    header = ''  # first, create the header
+    for s in list(df):
+        header += '"' + s + '"|'
+    header = header[:-1]  # to take the final | off, as it's unnecessary
+    # take the values of each column and add double quotes
+    df.update(df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
+                  "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]].applymap('"{}"'.format))
+
+    # now, save to a text file with a | separator
+    print("Please name the txt file that will be uploaded to CAMA")
+    np.savetxt(input() + 'Longmont_permits.txt', df.values, fmt='%s', header=header, comments='', delimiter='|')
+
+    return df
+
+
+final_cleanup_and_export(df_merge_perm)

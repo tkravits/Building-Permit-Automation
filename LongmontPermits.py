@@ -85,6 +85,9 @@ def spreadsheet_formatter(df):
     elif 'IssuedDate' in df.columns:
         df = df.rename(columns={'IssuedDate': 'Issued Date'})
 
+    if 'FinaledDat' in df.columns:
+        df = df.rename(columns={'FinaledDat': 'Final Date'})
+
     if 'PermitNum' in df.columns:
         df = df.rename(columns={'PermitNum': 'Permit Number'})
 
@@ -96,6 +99,12 @@ def spreadsheet_formatter(df):
 
     if 'Descriptio' in df.columns:
         df = df.rename(columns={'Descriptio': 'Description'})
+
+        # removes *, ", and carriage returns
+        df['Description'].replace(regex=True, inplace=True, to_replace=r'\*', value=r'')
+        df['Description'].replace(regex=True, inplace=True, to_replace=r'\n', value=r'')
+        df['Description'].replace(regex=True, inplace=True, to_replace=r'\r', value=r'')
+        df['Description'].replace(regex=True, inplace=True, to_replace=r'\"', value=r'')
 
     if 'OBJECTID' in df.columns:
         df.drop(columns=['OBJECTID'], inplace=True)
@@ -174,12 +183,16 @@ def longmont_permit_classifier(df):
         df.loc[df['Work Class'].str.contains('Interior', case=False, na=False) &
                df['Description'].str.contains('repair', case=False, na=False), 'SCOPE'] = 'GRP'
         df.loc[df['Work Class'].str.contains('Repair', na=False), 'SCOPE'] = 'GRP'
+        df.loc[(df['Work Class'].str.contains('Interior', case=False, na=False)) & (
+            df['Description'].str.contains('foundation', case=False, na=False)), 'SCOPE'] = 'SRP'
         df.loc[(df['Work Class'].str.contains('Interior', na=False)) & (
             df['Description'].str.contains('stabilization', case=False, na=False)), 'SCOPE'] = 'SRP'
         df.loc[(df['Description'].str.contains('Repair', na=False)) & (
             df['Description'].str.contains('foundation', case=False, na=False)), 'SCOPE'] = 'SRP'
         df.loc[(df['Work Class'].str.contains('Interior', na=False)) & (
             df['Description'].str.contains('structural', case=False, na=False)), 'SCOPE'] = 'SRP'
+        df.loc[(df['Work Class'].str.contains('Interior', na=False)) & (
+            df['Description'].str.contains('stabilize', case=False, na=False)), 'SCOPE'] = 'SRP'
         df.loc[
             (df['Work Class'].str.contains('Remodel', case=False, na=False)) & (
                 df['Description'].str.contains('fire', case=False, na=False)), 'SCOPE'] = 'FRP'
@@ -472,13 +485,13 @@ def final_cleanup_and_export(df):
     # create spreadsheet for app.
     print('Please name the exported spreadsheet for the Appraiser staff')
     df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
-             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE",
+             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SQFT", "SCOPE",
              "nh_cd", "dor_cd", "map_id"]]
 
     df.to_excel(input() + "_LongmontPermits_Appraiser.xlsx", index=False)
 
     df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
-                         "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]]
+            "str", "str_sfx", "str_unit", "Value Total", "Final Date", "Issued Date", "SQFT", "SCOPE"]]
 
     # export final data to a txt file to be imported
     header = ''  # first, create the header

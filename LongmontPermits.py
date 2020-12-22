@@ -491,7 +491,7 @@ def final_cleanup_and_export(df):
     df.to_excel(input() + "_LongmontPermits_Appraiser.xlsx", index=False)
 
     df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
-            "str", "str_sfx", "str_unit", "Value Total", "Final Date", "Issued Date", "SQFT", "SCOPE"]]
+            "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SQFT", "SCOPE"]]
 
     # export final data to a txt file to be imported
     header = ''  # first, create the header
@@ -500,7 +500,7 @@ def final_cleanup_and_export(df):
     header = header[:-1]  # to take the final | off, as it's unnecessary
     # take the values of each column and add double quotes
     df.update(df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
-                  "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]].applymap('"{}"'.format))
+                  "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SQFT", "SCOPE"]].applymap('"{}"'.format))
 
     # now, save to a text file with a | separator
     print("Please name the txt file that will be uploaded to CAMA")

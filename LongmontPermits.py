@@ -122,18 +122,20 @@ def spreadsheet_formatter(df):
 
 
 def issued_date_filter(df):
-    # create an input to select the earliest date the user wants to upload
-    print('Please input the earliest date you would like (ex: 09/26/2020)')
-    date = input('Date: ')
-    try:
-        if 'Issued Date' in df.columns:
-            df['Issued Date'] = pd.to_datetime(df['Issued Date'])
-            df = df[df['Issued Date'] > date]
+    while True:
+        # create an input to select the earliest date the user wants to upload
+        print('Please input the earliest date you would like (ex: 09/26/2020)')
+        date = input('Date: ')
+        try:
+            if 'Issued Date' in df.columns:
+                df['Issued Date'] = pd.to_datetime(df['Issued Date'])
+                df = df[df['Issued Date'] > date]
 
-    except TypeError:
-        print('Please input date in format using month/day/year')
+        except TypeError:
+            print('Please rerun program and input date in format using month/day/year')
+            continue
 
-    return df
+        return df
 
 
 def longmont_permit_classifier(df):
@@ -371,16 +373,6 @@ def longmont_permit_classifier(df):
     return df
 
 
-# Run the spreadsheet formatter
-df = spreadsheet_formatter(df)
-
-# Run issued date function
-df = issued_date_filter(df)
-
-# Run the permit classifier function
-df = longmont_permit_classifier(df)
-
-
 def db_connection(df):
     print('Establishing connection...\n')
     c_str = open('connection_string.txt', 'r').read()  # can be removed once connection string is added
@@ -409,17 +401,6 @@ def db_connection(df):
     return permit_sql_df, longmont_sql_df
 
 
-# Create two df, one containing all building permits and one containing all Longmont addresses w/straps
-permit, longmont_address = db_connection(df)
-
-# Merge the queried building permits with the ones already uploaded in CAMA
-df_uploaded = pd.merge(df, permit, on='Permit Number')
-
-# Check to see if an already uploaded permit is in CAMA
-df = df.loc[~df['Permit Number'].isin(df_uploaded['Permit Number'])]
-df.drop_duplicates()
-
-
 def longmont_address_format(df):
     # attempting to take our situs address, concat, and compare with the city's permit address
     # (only using active accts, no possessory interest)
@@ -446,9 +427,6 @@ def longmont_address_format(df):
     return df
 
 
-longmont_address = longmont_address_format(longmont_address)
-
-
 def address_and_parcel_merge(df):
     # merges the CAMA accounts database (strap) with the created Address field with the city's permit spreadsheet
     df['Address'] = df['Address'].str.replace(' UNIT ', ' ')
@@ -469,8 +447,6 @@ def address_and_parcel_merge(df):
 
     return df, df_merge_perm, df_unmerged_addresses
 
-
-df, df_merge_perm, df_unmerged_addresses = address_and_parcel_merge(df)
 
 def final_cleanup_and_export(df):
     df['strap'] = df['strap_final'].str.rstrip()
@@ -508,5 +484,28 @@ def final_cleanup_and_export(df):
 
     return df
 
+
+# Run the spreadsheet formatter
+df = spreadsheet_formatter(df)
+
+# Run issued date function
+df = issued_date_filter(df)
+
+# Run the permit classifier function
+df = longmont_permit_classifier(df)
+
+# Create two df, one containing all building permits and one containing all Longmont addresses w/straps
+permit, longmont_address = db_connection(df)
+
+# Merge the queried building permits with the ones already uploaded in CAMA
+df_uploaded = pd.merge(df, permit, on='Permit Number')
+
+# Check to see if an already uploaded permit is in CAMA
+df = df.loc[~df['Permit Number'].isin(df_uploaded['Permit Number'])]
+df.drop_duplicates()
+
+longmont_address = longmont_address_format(longmont_address)
+
+df, df_merge_perm, df_unmerged_addresses = address_and_parcel_merge(df)
 
 final_cleanup_and_export(df_merge_perm)

@@ -52,33 +52,15 @@ def louisville_spreadsheet_formatter(df):
     # then looks for 1 or more matches (+), | looks for all possible matches
     df['Permit Number'] = df['Permit Number'].replace('(^[dD]escription:)+', np.nan, regex=True)
     df['Permit Number'] = df['Permit Number'].replace('(^[^(MEP|MISC|TEMP|COM|RES)])+', np.nan, regex=True)
-    # g = df.groupby('Permit Number').Address
-    # pd.concat([g.apply(list), g.count()], axis=1, keys=['Permit Number'])
-    # Data is mostly clean but need to figure out how to get description column to fill in the correct location
-    # df = df.groupby(['Permit Number'])['Description'].apply(','.join).reset_index()
-    # df['Permit Number'] = df['Permit Number'].ffill()
-    # df = df.groupby(["Permit Number", "Permit Code", "Permit Type", "Parcel Number", 'Address', 'Issued Date',
-    #               'Permit Value', 'Contractor'])['Description'].cummax().reset_index()
+    # Creates two masks, mask is the column that will change positions, fmask is going to be the column that stays the same
+    mask = df['Description'].notnull()
+    fmask = (df['Permit Number'].notnull() & df['Description'].isnull())
+    # Create two masking one representing the rows where the current Description value is now.
+    # And, the second mask puts True on the first record where you want the Description value to move too.
+    # Group on the first mask with cumsum and put that current value on all records, then use the second mask with where
+    df = df.assign(Description=df.groupby(mask[::-1].cumsum())['Description'].transform(lambda x: x.iloc[-1]).where(fmask))
+    df = df.dropna(subset=['Permit Number'])
     return df
 
 df = file_opener()
 df = louisville_spreadsheet_formatter(df)
-# This is my attempt at taking the PDF and using pdfplumber to parse out into a dataframe. In the essence of time
-# I opted to use the old system of Able2Extract and put it in an excel format as seen above
-# df = []
-# with pdfplumber.open(r"C:\Users\tkravits\Github\Building-Permit-Automation\Louisville_December2020.pdf") as pdf:
-#     for page in pdf.pages:
-#         text = page.extract_text()
-#         df.append(text)
-#         str1 = ''.join(df)
-# #        core_pat = re.compile(r"CONTACTS", re.DOTALL)
-# #        core = re.search(core_pat, str1).group(0)
-#
-# # converts the list into a dataframe
-# df = pd.DataFrame(df)
-#
-# # Use negative look behind basically anything after "Concession Amt:" will be pulled
-# df['Concession Amt'] = df.apply(''.join, axis=1).str.extract('((?<=80027 ).*)')
-#
-# # TODO - need to use regex to remove the header and footers of the total pdf to make one large list
-# # TODO - then I need to group the permits by each new line (aka the permit info and the description)

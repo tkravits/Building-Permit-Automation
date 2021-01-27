@@ -3,9 +3,6 @@ import pyodbc
 import numpy as np
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename
-from openpyxl import Workbook
-import glob
-import csv
 from dbfread import DBF
 from pandas import DataFrame
 
@@ -60,7 +57,10 @@ def municipal_chooser():
             elif city is 'Lafayette':
                 city = 'Lafayette'
 
-            elif city not in ['Boulder', 'Longmont', 'Superior', 'Lafayette']:
+            elif city is 'Louisville':
+                city = 'Louisville'
+
+            elif city not in ['Boulder', 'Longmont', 'Superior', 'Lafayette', 'Louisville']:
                 print('Please input a valid city or use format (ex: Boulder, Longmont)')
                 continue
 
@@ -198,6 +198,29 @@ def superior_spreadsheet_formatter(df):
 
     # drop any rows that did not convert to a datetime
     df.dropna(subset=['Issued Date'], how='all', inplace=True)
+    return df
+
+
+def louisville_spreadsheet_formatter(df):
+    df.columns = ["Permit Number", "Permit Code", "Work Class", "Parcel Number", 'Address', 'Issued Date',
+                  'Value Total', 'Contractor']
+    # using regex to do a negative lookbehind '?<=' to capture all text .* behind 'Description: ', '[]' is an either/or,
+    # need to group the lookbehind and the capture all text in ()
+    df['Description'] = df['Permit Number'].str.extract('((?<=[dD]escription: ).*)')
+    # using regex to replace Description with nan, ^ looks for Description at the beginning on a string
+    # then looks for 1 or more matches (+), | looks for all possible matches
+    df['Permit Number'] = df['Permit Number'].replace('(^[dD]escription:)+', np.nan, regex=True)
+    df['Permit Number'] = df['Permit Number'].replace('(^[^(MEP|MISC|TEMP|COM|RES)])+', np.nan, regex=True)
+    # Creates two masks, mask is the column that will change positions, fmask is going to be the column that stays the same
+    mask = df['Description'].notnull()
+    fmask = (df['Permit Number'].notnull() & df['Description'].isnull())
+    # Create two masking one representing the rows where the current Description value is now.
+    # And, the second mask puts True on the first record where you want the Description value to move too.
+    # Group on the first mask with cumsum and put that current value on all records, then use the second mask with where
+    df = df.assign(Description=df.groupby(mask[::-1].cumsum())['Description'].transform(lambda x: x.iloc[-1]).where(fmask))
+    df = df.dropna(subset=['Permit Number', 'Issued Date'])
+    #df = df.dropna(subset=['Issued Date'])
+    df = df.drop(['Contractor', 'Permit Code'], axis=1)
     return df
 
 
@@ -521,7 +544,7 @@ def address_and_parcel_merge(df):
             df_merge_perm['strap_x'].notnull(), df_merge_perm['strap_y'])
         df_merge_perm.drop_duplicates(subset=['Permit Number'], keep='last', inplace=True)
 
-    elif city in ['Boulder', 'Superior']:
+    elif city in ['Boulder', 'Superior', 'Louisville']:
         df = df.merge(city_address, on='Address', how='left')
         df.drop(columns=['Parcel Number_y'])
         df = df.rename(columns={'Parcel Number_x': 'Parcel Number'})
@@ -564,11 +587,15 @@ def final_cleanup_and_export(df):
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
              "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SQFT", "SCOPE",
              "nh_cd", "dor_cd", "map_id"]]
-    elif city in ['Boulder', 'Superior']:
+    elif city == 'Boulder':
+        df = df[["Permit Number", "Parent Permit Number", "strap", "Description", "str_num", "str_pfx",
+                 "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE",
+                 "nh_cd", "dor_cd", "map_id"]]
+    elif city == 'Superior':
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
                  "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE",
                  "nh_cd", "dor_cd", "map_id"]]
-    elif city == 'Lafayette':
+    elif city in ['Lafayette', 'Louisville']:
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
                  "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE",
                  "nh_cd", "dor_cd", "map_id"]]
@@ -578,11 +605,15 @@ def final_cleanup_and_export(df):
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SQFT", "SCOPE"]]
 
-    elif city in ['Boulder', 'Superior']:
+    elif city == 'Boulder':
+        df = df[["Permit Number", "Parent Permit Number", "strap", "Description", "str_num", "str_pfx",
+                 "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE"]]
+
+    elif city == 'Superior':
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE"]]
 
-    elif city == 'Lafayette':
+    elif city in ['Lafayette', 'Louisville']:
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]]
 
@@ -600,12 +631,9 @@ def final_cleanup_and_export(df):
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE"]]
 
-    elif city == 'Lafayette':
+    elif city in ['Lafayette', 'Louisville']:
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]]
-
-#    df.update(df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
-#                  "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SQFT", "SCOPE"]].applymap('"{}"'.format))
 
     # now, save to a text file with a | separator
     print("Please name the txt file that will be uploaded to CAMA")
@@ -623,6 +651,8 @@ city = municipal_chooser()
 # styles to format
 if city == 'Superior':
     df = superior_spreadsheet_formatter(df)
+if city == 'Louisville':
+    df = louisville_spreadsheet_formatter(df)
 elif city in ['Boulder', 'Longmont', 'Lafayette']:
     df = spreadsheet_formatter(df)
 

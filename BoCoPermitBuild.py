@@ -60,7 +60,10 @@ def municipal_chooser():
             elif city is 'Louisville':
                 city = 'Louisville'
 
-            elif city not in ['Boulder', 'Longmont', 'Superior', 'Lafayette', 'Louisville']:
+            elif city is 'Unincorporated':
+                city = 'Unincorporated'
+
+            elif city not in ['Boulder', 'Longmont', 'Superior', 'Lafayette', 'Louisville', 'Unincorporated']:
                 print('Please input a valid city or use format (ex: Boulder, Longmont)')
                 continue
 
@@ -72,6 +75,8 @@ def municipal_chooser():
 
 
 def spreadsheet_formatter(df):
+    if 'Parcel Number' in df.columns:
+        df['Parcel Number'] = df['Parcel Number'].astype(str)
     if 'PIN' in df.columns:
         df = df.rename(columns={'PIN': 'Parcel Number'})  # else if named pin, rename it
 
@@ -96,11 +101,9 @@ def spreadsheet_formatter(df):
 
     if 'PermitWorkType' in df.columns:
         df = df.rename(columns={'PermitWorkType': 'Work Class'})
-
-    if 'Alias' in df.columns:
+    elif 'Alias' in df.columns:
         df = df.rename(columns={'Alias': 'Work Class'})
-
-    if 'Project Type' in df.columns:
+    elif 'Project Type' in df.columns:
         df = df.rename(columns={'Project Type': 'Work Class'})
 
     if 'PermitType' in df.columns:
@@ -115,8 +118,8 @@ def spreadsheet_formatter(df):
         df = df.rename(columns={'IssuedDate': 'Issued Date'})
     elif 'Permit Issued Date' in df.columns:
         df = df.rename(columns={'Permit Issued Date': 'Issued Date'})
-    elif 'Issued_Date' or 'IssuedDate' in ~df.columns:
-        df['Issued Date'] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
+    # elif 'Issued_Date' or 'IssuedDate' in ~df.columns:
+    #     df['Issued Date'] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
 
     if 'FinaledDat' in df.columns:
         df = df.rename(columns={'FinaledDat': 'Final Date'})
@@ -137,6 +140,11 @@ def spreadsheet_formatter(df):
         df['Description'].replace(regex=True, inplace=True, to_replace=r'\n', value=r'')
         df['Description'].replace(regex=True, inplace=True, to_replace=r'\r', value=r'')
         df['Description'].replace(regex=True, inplace=True, to_replace=r'\"', value=r'')
+    if 'Description' in df.columns:
+        df['Description'].replace(regex=True, inplace=True, to_replace=r'\*', value=r'')
+        df['Description'].replace(regex=True, inplace=True, to_replace=r'\n', value=r'')
+        df['Description'].replace(regex=True, inplace=True, to_replace=r'\r', value=r'')
+        df['Description'].replace(regex=True, inplace=True, to_replace=r'\"', value=r'')
     if 'Project Description' in df.columns:
         df = df.rename(columns={'Project Description': 'Description'})
         # removes *, ", and carriage returns
@@ -150,6 +158,9 @@ def spreadsheet_formatter(df):
 
     if 'jobValue' in df.columns:
         df = df.rename(columns={'jobValue': 'Value Total'})
+        df['Value Total'] = df['Value Total'].astype('int')
+    elif 'Construction Value' in df.columns:
+        df = df.rename(columns={'Construction Value': 'Value Total'})
         df['Value Total'] = df['Value Total'].astype('int')
     elif 'Valuation' in df.columns:
         df = df.rename(columns={'Valuation': 'Value Total'})
@@ -270,12 +281,11 @@ def permit_classifier(df):
             df['Description'].str.contains('doors', case=False, na=False)), 'SCOPE'] = 'W/D'
         df.loc[(df['Work Class'].str.contains('Remodel', case=False, na=False)), 'SCOPE'] = 'REM'
         df.loc[df['Description'].str.contains('PV', case=False, na=False), 'SCOPE'] = 'ENR'
-        df.loc[df['Description'].str.contains('solar', case=False, na=False), 'SCOPE'] = 'ENR'
-        df.loc[df['Description'].str.contains('photo', case=False, na=False), 'SCOPE'] = 'ENR'
-        df.loc[df['Description'].str.contains('P.V.', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Description'].str.contains('photovoltaic', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Description'].str.contains('geotherm', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Description'].str.contains('flush-mounted', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('wood fireplace', case=False, na=False), 'SCOPE'] = 'WFP'
+        df.loc[df['Description'].str.contains('wood stove', case=False, na=False), 'SCOPE'] = 'WFP'
         df.loc[(df['Work Class'].str.contains('Combo', na=False)) & (
             df['Description'].str.contains('gas fireplace', case=False, na=False)), 'SCOPE'] = 'GFP'
         df.loc[(df['Work Class'].str.contains('Mechanical', na=False)) & (
@@ -407,7 +417,6 @@ def permit_classifier(df):
         df.loc[df['Description'].str.contains(' AC', na=False), 'SCOPE'] = 'AIR'
         df.loc[df['Description'].str.contains('A/C', case=False, na=False), 'SCOPE'] = 'AIR'
         df.loc[df['Description'].str.contains('air condition', case=False, na=False), 'SCOPE'] = 'AIR'
-
         df.loc[df['Description'].str.contains(' shed ', case=False, na=False), 'SCOPE'] = 'OUT'
         df.loc[(df['Description'].str.contains('Roof', case=False, na=False)), 'SCOPE'] = 'RRR'
         df.loc[(df['Description'].str.contains('asphalt', na=False)) & (
@@ -475,19 +484,222 @@ def permit_classifier(df):
     return df
 
 
+def unincorp_permit_classifier(df):
+    if 'Description' in df.columns:
+        # Classifies the description into a format that CAMA can understand
+        df.loc[df['Description'].str.contains('generator', case=False, na=False), 'SCOPE'] = 'ELM'
+        df.loc[df['Description'].str.contains('outlet', case=False, na=False), 'SCOPE'] = 'ELM'
+        df.loc[(df['Description'].str.contains('emergency', case=False, na=False)) & (
+            df['Description'].str.contains('repair', case=False, na=False)), 'SCOPE'] = 'OTH'
+        df.loc[df['Description'].str.contains('RTU', case=False, na=False), 'SCOPE'] = 'HTG'
+        df.loc[df['Description'].str.contains('RTUs', case=False, na=False), 'SCOPE'] = 'HTG'
+        df.loc[df['Description'].str.contains('Mechanical', na=False), 'SCOPE'] = 'ELM'
+        df.loc[df['Description'].str.contains('Electrical', case=False, na=False), 'SCOPE'] = 'ELM'
+        df.loc[df['Description'].str.contains('Roofing', na=False), 'SCOPE'] = 'RRR'
+        df.loc[df['Description'].str.contains('heat', case=False, na=False), 'SCOPE'] = 'OTH'
+        df.loc[df['Description'].str.contains('boiler', case=False, na=False), 'SCOPE'] = 'OTH'
+        df.loc[df['Description'].str.contains('ductless', case=False, na=False), 'SCOPE'] = 'HTG'
+        df.loc[df['Description'].str.contains('furnace', case=False, na=False), 'SCOPE'] = 'HTG'
+        df.loc[df['Description'].str.contains('heater', case=False, na=False), 'SCOPE'] = 'OTH'
+        df.loc[df['Description'].str.contains('Window', case=False, na=False), 'SCOPE'] = 'W/D'
+        df.loc[df['Description'].str.contains('doors', case=False, na=False), 'SCOPE'] = 'W/D'
+        df.loc[df['Description'].str.contains('Remodel', case=False, na=False), 'SCOPE'] = 'REM'
+        df.loc[df['Description'].str.contains('PV', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('solar', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('photo', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('photovoltaic', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('geotherm', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('flush-mounted', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('wood fireplace', case=False, na=False), 'SCOPE'] = 'WFP'
+        df.loc[df['Description'].str.contains('wood stove', case=False, na=False), 'SCOPE'] = 'WFP'
+        df.loc[df['Description'].str.contains('gas fireplace', case=False, na=False), 'SCOPE'] = 'GFP'
+        df.loc[df['Description'].str.contains('existing wood-burning', case=False, na=False), 'SCOPE'] = 'GFP'
+        df.loc[(df['Description'].str.contains('wood burning', case=False, na=False)
+                & (df['Description'].str.contains('replace', case=False, na=False))), 'SCOPE'] = 'GFP'
+        df.loc[df['Description'].str.contains('Interior', case=False, na=False) &
+               df['Description'].str.contains('repair', case=False, na=False), 'SCOPE'] = 'GRP'
+        df.loc[df['Description'].str.contains('Repair', na=False), 'SCOPE'] = 'GRP'
+        df.loc[(df['Description'].str.contains('Interior', case=False, na=False)) & (
+            df['Description'].str.contains('foundation', case=False, na=False)), 'SCOPE'] = 'SRP'
+        df.loc[(df['Description'].str.contains('Interior', na=False)) & (
+            df['Description'].str.contains('stabilization', case=False, na=False)), 'SCOPE'] = 'SRP'
+        df.loc[(df['Description'].str.contains('Repair', na=False)) & (
+            df['Description'].str.contains('foundation', case=False, na=False)), 'SCOPE'] = 'SRP'
+        df.loc[(df['Description'].str.contains('Interior', na=False)) & (
+            df['Description'].str.contains('structural', case=False, na=False)), 'SCOPE'] = 'SRP'
+        df.loc[(df['Description'].str.contains('Interior', na=False)) & (
+            df['Description'].str.contains('stabilize', case=False, na=False)), 'SCOPE'] = 'SRP'
+        df.loc[(df['Description'].str.contains('Remodel', case=False, na=False)) & (
+                df['Description'].str.contains('fire', case=False, na=False)), 'SCOPE'] = 'FRP'
+        df.loc[df['Description'].str.contains('gas fireplace', case=False, na=False), 'SCOPE'] = 'GFP'
+        df.loc[df['Description'].str.contains('Elevator', case=False, na=False), 'SCOPE'] = 'ELE'
+        df.loc[df['Description'].str.contains('Siding', na=False), 'SCOPE'] = 'SDG'
+        df.loc[(df['Description'].str.contains('Right', na=False)) & (
+            df['Description'].str.contains('sewer', case=False, na=False)), 'SCOPE'] = 'RWSRPR'
+        df.loc[df['Description'].str.contains('Fence', na=False), 'SCOPE'] = 'FEN'
+        df.loc[df['Description'].str.contains('Tenant', na=False), 'SCOPE'] = 'TFN'
+        df.loc[(df['Description'].str.contains('Remodel', na=False)) & (
+            df['Description'].str.contains('finished basement', case=False, na=False)), 'SCOPE'] = 'BFN'
+        df.loc[(df['Description'].str.contains('Remodel', na=False)) & (
+            df['Description'].str.contains('basement finish', case=False, na=False)), 'SCOPE'] = 'BFN'
+        df.loc[(df['Description'].str.contains('Remodel', na=False)) & (
+            df['Description'].str.contains('basement remodel', case=False, na=False)), 'SCOPE'] = 'BFN'
+        df.loc[(df['Description'].str.contains('Remodel', na=False)) & (
+            df['Description'].str.contains('bathroom remodel', case=False, na=False)), 'SCOPE'] = 'BTH'
+        df.loc[(df['Description'].str.contains('Remodel', na=False)) & (
+            df['Description'].str.contains('bath remodel', case=False, na=False)), 'SCOPE'] = 'BTH'
+        df.loc[(df['Description'].str.contains('commercial', case=False, na=False)) & (
+            df['Description'].str.contains('remodel', case=False, na=False)), 'SCOPE'] = 'TFN'
+        df.loc[(df['Description'].str.contains('detached', na=False)) & (
+            df['Description'].str.contains('garage', case=False, na=False)), 'SCOPE'] = 'GAR'
+        df.loc[df['Description'].str.contains('Addition', na=False), 'SCOPE'] = 'ADD'
+        df.loc[(df['Description'].str.contains('Addition', na=False)) & (
+            df['Description'].str.contains(' deck', case=False, na=False)), 'SCOPE'] = 'DEC'
+        df.loc[(df['Description'].str.contains('Deck', case=False, na=False)) & (
+            df['Description'].str.contains('deck', case=False, na=False)), 'SCOPE'] = 'DEC'
+        df.loc[(df['Description'].str.contains('Addition', na=False)) & (
+            df['Description'].str.contains('new porch', case=False, na=False)), 'SCOPE'] = 'POR'
+        df.loc[(df['Description'].str.contains('Addition', na=False)) & (
+            df['Description'].str.contains('pergola', case=False, na=False)), 'SCOPE'] = 'POR'
+        df.loc[(df['Description'].str.contains('Addition', na=False)) & (
+            df['Description'].str.contains(' shed', case=False, na=False)), 'SCOPE'] = 'OUT'
+        df.loc[df['Description'].str.contains('Wireless', na=False), 'SCOPE'] = 'OTH'
+        df.loc[(df['Description'].str.contains('Cell', case=False, na=False)), 'SCOPE'] = 'OTH'
+        df.loc[df['Description'].str.contains('Demo', case=False, na=False), 'SCOPE'] = 'DEM'
+        df.loc[(df['Description'].str.contains('Demo', case=False, na=False)) & (
+            df['Description'].str.contains('interior', case=False, na=False)), 'SCOPE'] = 'REM'
+        df.loc[df['Description'].str.contains('Sign', na=False), 'SCOPE'] = 'SGN'
+        df.loc[(df['Description'].str.contains('Mobile Home', na=False)) & (
+            df['Description'].str.contains('replacement', case=False, na=False)), 'SCOPE'] = 'MHN'
+        df.loc[(df['Description'].str.contains('Mobile Home', na=False)) & (
+            df['Description'].str.contains('new', case=False, na=False)), 'SCOPE'] = 'MHN'
+        df.loc[(df['Description'].str.contains('Roofing', na=False)) & (
+                df['Description'].str.contains('roof', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('Roofing', na=False)) & (
+            df['Description'].str.contains('single', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('Roofing', na=False)) & (
+                df['Description'].str.contains('SFD', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('Roofing', na=False)) & (
+            df['Description'].str.contains('residential', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('Roofing', na=False)) & (
+                df['Description'].str.contains('multi', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('Roofing', na=False)) & (
+            df['Description'].str.contains('duplex', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('Roofing', na=False)) & (
+            df['Description'].str.contains('re-roof', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('Roofing', na=False)) & (
+            df['Description'].str.contains('re roof', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('Roofing', na=False)) & (
+            df['Description'].str.contains('shingle', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('Commercial', case=False, na=False)) & (
+            df['Description'].str.contains('re-roof', case=False, na=False)), 'SCOPE'] = 'CRR'
+        df.loc[df['Description'].str.contains('valve', case=False, na=False), 'SCOPE'] = 'OTH'
+        df.loc[df['Description'].str.contains('pipe', case=False, na=False), 'SCOPE'] = 'OTH'
+        df.loc[df['Description'].str.contains('electric', case=False, na=False), 'SCOPE'] = 'ELM'
+        df.loc[df['Description'].str.contains('electrical', case=False, na=False), 'SCOPE'] = 'ELM'
+        df.loc[df['Description'].str.contains('wire', case=False, na=False), 'SCOPE'] = 'ELM'
+        df.loc[df['Description'].str.contains('boiler', case=False, na=False), 'SCOPE'] = 'OTH'
+        df.loc[df['Description'].str.contains('ductless', case=False, na=False), 'SCOPE'] = 'HTG'
+        df.loc[df['Description'].str.contains('furnace', case=False, na=False), 'SCOPE'] = 'HTG'
+        df.loc[df['Description'].str.contains('heater', case=False, na=False), 'SCOPE'] = 'OTH'
+        df.loc[df['Description'].str.contains('/AC', case=False, na=False), 'SCOPE'] = 'AIR'
+        df.loc[df['Description'].str.contains('A/C', case=False, na=False), 'SCOPE'] = 'AIR'
+        df.loc[df['Description'].str.contains('cooler', case=False, na=False), 'SCOPE'] = 'AIR'
+        df.loc[df['Description'].str.contains('AC ', case=False, na=False), 'SCOPE'] = 'AIR'
+        df.loc[df['Description'].str.contains(' AC', na=False), 'SCOPE'] = 'AIR'
+        df.loc[df['Description'].str.contains('mini-split', case=False, na=False), 'SCOPE'] = 'AIR'
+        df.loc[df['Description'].str.contains('mini split', case=False, na=False), 'SCOPE'] = 'AIR'
+        df.loc[df['Description'].str.contains('condenser', case=False, na=False), 'SCOPE'] = 'AIR'
+        df.loc[df['Description'].str.contains('air condition', case=False, na=False), 'SCOPE'] = 'AIR'
+        df.loc[df['Description'].str.contains('a/c', case=False, na=False), 'SCOPE'] = 'AIR'
+        df.loc[df['Description'].str.contains(' ac ', case=False, na=False), 'SCOPE'] = 'AIR'
+        df.loc[df['Description'].str.contains(' a/c ', case=False, na=False), 'SCOPE'] = 'AIR'
+        df.loc[df['Description'].str.contains(' shed ', case=False, na=False), 'SCOPE'] = 'OUT'
+        df.loc[(df['Description'].str.contains('Roof', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('asphalt', na=False)) & (
+            df['Description'].str.contains('replace', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[df['Description'].str.contains('patio', case=False, na=False), 'SCOPE'] = 'POR'
+        df.loc[df['Description'].str.contains('porch', case=False, na=False), 'SCOPE'] = 'POR'
+        df.loc[df['Description'].str.contains('pergola', case=False, na=False), 'SCOPE'] = 'POR'
+        df.loc[(df['Description'].str.contains('commercial', case=False, na=False)) & (
+            df['Description'].str.contains('roof', case=False, na=False)), 'SCOPE'] = 'CRR'
+        df.loc[df['Description'].str.contains(' PV ', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('solar', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('photo', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('P.V.', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('photovoltaic', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('geotherm', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('flush-mounted', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[df['Description'].str.contains('flush mounted', case=False, na=False), 'SCOPE'] = 'ENR'
+        df.loc[(df['Description'].str.contains('reroof', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('shingles', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('re-roof', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('owens', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('TPO', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[(df['Description'].str.contains('R&R', case=False, na=False)), 'SCOPE'] = 'RRR'
+        df.loc[df['Description'].str.contains('privacy', case=False, na=False), 'SCOPE'] = 'FEN'
+        df.loc[df['Description'].str.contains('fencing', case=False, na=False), 'SCOPE'] = 'FEN'
+        df.loc[df['Description'].str.contains('Tenant', case=False, na=False), 'SCOPE'] = 'TFN'
+        df.loc[df['Description'].str.contains('sewer', case=False, na=False), 'SCOPE'] = 'RWSRPR'
+        df.loc[df['Description'].str.contains('finished basement', case=False, na=False), 'SCOPE'] = 'BFN'
+        df.loc[df['Description'].str.contains('basement finish', case=False, na=False), 'SCOPE'] = 'BFN'
+        df.loc[df['Description'].str.contains('basement remodel', case=False, na=False), 'SCOPE'] = 'BFN'
+        df.loc[df['Description'].str.contains('BSMT finish', case=False, na=False), 'SCOPE'] = 'BFN'
+        df.loc[df['Description'].str.contains('basement bathroom', case=False, na=False), 'SCOPE'] = 'BFN'
+        df.loc[df['Description'].str.contains('bathroom remodel', case=False, na=False), 'SCOPE'] = 'BTH'
+        df.loc[df['Description'].str.contains('bath remodel', case=False, na=False), 'SCOPE'] = 'BTH'
+        df.loc[df['Description'].str.contains('tenant', case=False, na=False), 'SCOPE'] = 'TFN'
+        df.loc[df['Description'].str.contains('tenant', case=False, na=False), 'SCOPE'] = 'TFN'
+        df.loc[(df['Description'].str.contains('interior', case=False, na=False) &
+                df['Description'].str.contains('commercial', case=False, na=False)), 'SCOPE'] = 'TFN'
+        df.loc[df['Description'].str.contains('New Construction', case=False, na=False), 'SCOPE'] = 'NEW'
+        df.loc[df['Description'].str.contains('New Single Family', case=False, na=False), 'SCOPE'] = 'NEW'
+        df.loc[df['Description'].str.contains('BWOP', case=False, na=False), 'SCOPE'] = 'NEW'
+        df.loc[df['Description'].str.contains('Structural', case=False, na=False) & (
+            df['Description'].str.contains('repair', case=False, na=False)), 'SCOPE'] = 'SRP'
+        df.loc[df['Description'].str.contains('siding', case=False, na=False), 'SCOPE'] = 'SDG'
+        df.loc[df['Description'].str.contains('pool', case=False, na=False), 'SCOPE'] = 'POL'
+        df.loc[df['Description'].str.contains('hot tub', case=False, na=False), 'SCOPE'] = 'HTS'
+        df.loc[df['Description'].str.contains('Spa ', case=False, na=False), 'SCOPE'] = 'HTS'
+        df.loc[df['Description'].str.contains(' Spa ', case=False, na=False), 'SCOPE'] = 'HTS'
+        df.loc[df['Description'].str.contains(' Spa', case=False, na=False), 'SCOPE'] = 'HTS'
+        df.loc[df['Description'].str.contains('Wireless', na=False), 'SCOPE'] = 'OTH'
+        df.loc[df['Description'].str.contains('Water line', case=False, na=False), 'SCOPE'] = 'OTH'
+        df.loc[df['Description'].str.contains('Gas line', case=False, na=False), 'SCOPE'] = 'OTH'
+        df.loc[(df['Description'].str.contains('gas', case=False, na=False)) & (
+            df['Description'].str.contains('repair', case=False, na=False)), 'SCOPE'] = 'OTH'
+        df.loc[df['Description'].str.contains('radon', case=False, na=False), 'SCOPE'] = 'OTH'
+        df['SCOPE'] = df['SCOPE'].fillna('OTH')
+
+
+    else:
+        print('Please provide a permit description column titled "Description"')
+
+    return df
+
+
 def database_connection(df):
     print('Establishing connection...\n')
     c_str = open('connection_string.txt', 'r').read()  # can be removed once connection string is added
     cnxn = pyodbc.connect(c_str)
 
-
-    city_sql = """SELECT distinct parcel.strap, strap_idx.folio, parcel.status_cd, parcel.dor_cd, parcel.nh_cd, 
+    if city == 'Unincorporated':
+        city_sql = """SELECT distinct parcel.strap, strap_idx.folio, parcel.status_cd, parcel.dor_cd, parcel.nh_cd, 
+                parcel.map_id, site.str_num, site.str_pfx, site.str, site.str_sfx, site.str_sfx_dir, site.str_unit
+        	    FROM r_prod.dbo.parcel
+                INNER JOIN r_prod.dbo.site ON parcel.strap = site.strap
+                INNER JOIN r_prod.dbo.strap_idx ON parcel.strap = strap_idx.strap
+                WHERE (parcel.dor_cd <> 'POSS') AND parcel.status_cd = 'A'
+                AND (site.city IN (?, 'Boulder', 'Lyons', 'Ward', 'Allenspark', 'Lafayette', 'Niwot', 
+                'Louisville', 'Superior', 'Jamestown'))"""
+    else:
+        city_sql = """SELECT distinct parcel.strap, strap_idx.folio, parcel.status_cd, parcel.dor_cd, parcel.nh_cd, 
         parcel.map_id, site.str_num, site.str_pfx, site.str, site.str_sfx, site.str_sfx_dir, site.str_unit
 	    FROM r_prod.dbo.parcel
         INNER JOIN r_prod.dbo.site ON parcel.strap = site.strap
         INNER JOIN r_prod.dbo.strap_idx ON parcel.strap = strap_idx.strap
         WHERE (parcel.dor_cd <> 'POSS') AND parcel.status_cd = 'A'
-        AND (site.city IN (?, 'UNINCORPORATED'))"""
+        AND (site.city IN (?))"""
 
     permit_sql = '''SELECT distinct permit_num FROM r_prod.dbo.permit'''
 
@@ -563,7 +775,33 @@ def address_and_parcel_merge(df):
             df_merge_perm['strap_x'].notnull(), df_merge_perm['strap_y'])
         df_merge_perm.drop_duplicates(subset=['Permit Number'], keep='last', inplace=True)
 
-        # takes the unmerged addresses and makes a spreadsheet to be checked by hand
+    elif city == 'Unincorporated':
+        df['Street Number'] = df['Street Number'].astype(str)
+        df['Street Direction'] = df['Street Direction'].fillna(np.nan).replace(np.nan, ' ')
+        df['Street Unit'] = df['Street Unit'].fillna(np.nan).replace(np.nan, ' ')
+        df['Address'] = df['Street Number'].astype(str) + df['Street Direction'].astype(str) + \
+                        df['Street Name'].astype(str) + ' ' + df['Street Suffix'].astype(str) + df['Street Unit'].astype(str)
+        df['Address'] = df['Address'].str.replace(' DRIVE ', ' DR ')
+        df['Address'] = df['Address'].str.replace(' STREET ', ' ST ')
+        df['Address'] = df['Address'].str.replace(' ROAD ', ' RD ')
+        df['Address'] = df['Address'].str.replace(' COURT ', ' CT ')
+        df['Address'] = df['Address'].str.replace(' WAY ', ' WY ')
+        df['Address'] = df['Address'].str.replace(' CIRCLE ', ' CIR ')
+        df['Address'] = df['Address'].str.replace(' PLACE ', ' PL ')
+        df['Address'] = df['Address'].str.replace(' LANE ', ' LN ')
+        df['Address'] = df['Address'].str.replace(' TRAIL ', ' TRL ')
+        df['Address'] = df['Address'].str.replace(' AVENUE ', ' AVE ')
+        df['Address'] = df['Address'].str.rstrip()
+        df = df.merge(city_address, on='Address', how='left')
+        df.drop(columns=['Parcel Number_y'])
+        df = df.rename(columns={'Parcel Number_x': 'Parcel Number'})
+        df_merge_perm = df.merge(city_address, on='Parcel Number', how='left')
+        df_merge_perm['strap_final'] = df_merge_perm['strap_x'].where(
+            df_merge_perm['strap_x'].notnull(), df_merge_perm['strap_y'])
+        df_merge_perm.drop_duplicates(subset=['Permit Number'], keep='last', inplace=True)
+
+
+    # takes the unmerged addresses and makes a spreadsheet to be checked by hand
     df_unmerged_addresses = df_merge_perm.loc[df_merge_perm['strap_final'].isna()]
     df_merge_perm.dropna(subset=['strap_final'], inplace=True)
     df_unmerged_addresses.to_excel('HandEnter_' + city + '_permits_12_16.xlsx', index=False)
@@ -595,7 +833,7 @@ def final_cleanup_and_export(df):
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
                  "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE",
                  "nh_cd", "dor_cd", "map_id"]]
-    elif city in ['Lafayette', 'Louisville']:
+    elif city in ['Lafayette', 'Louisville', 'Unincorporated']:
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
                  "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE",
                  "nh_cd", "dor_cd", "map_id"]]
@@ -613,7 +851,7 @@ def final_cleanup_and_export(df):
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE"]]
 
-    elif city in ['Lafayette', 'Louisville']:
+    elif city in ['Lafayette', 'Louisville', 'Unincorporated']:
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]]
 
@@ -627,11 +865,15 @@ def final_cleanup_and_export(df):
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SQFT", "SCOPE"]]
 
-    elif city in ['Boulder', 'Superior']:
+    elif city in ['Superior']:
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE"]]
 
-    elif city in ['Lafayette', 'Louisville']:
+    elif city in ['Boulder']:
+        df = df[["Permit Number", "Parent Permit Number", "strap", "Description", "str_num", "str_pfx",
+                 "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE"]]
+
+    elif city in ['Lafayette', 'Louisville', 'Unincorporated']:
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]]
 
@@ -653,14 +895,18 @@ if city == 'Superior':
     df = superior_spreadsheet_formatter(df)
 if city == 'Louisville':
     df = louisville_spreadsheet_formatter(df)
-elif city in ['Boulder', 'Longmont', 'Lafayette']:
+elif city in ['Boulder', 'Longmont', 'Lafayette', 'Unincorporated']:
     df = spreadsheet_formatter(df)
 
-# Run issued date function
+#Run issued date function
 df = issued_date_filter(df)
 
 # Classify the permits using the three letter scope code
-df = permit_classifier(df)
+if city == 'Unincorporated':
+    df = unincorp_permit_classifier(df)
+else:
+    df = permit_classifier(df)
+
 
 # Create a permit dataframe and an address dataframe
 permit, city_address = database_connection(df)

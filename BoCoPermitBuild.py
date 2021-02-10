@@ -63,8 +63,12 @@ def municipal_chooser():
             elif city is 'Unincorporated':
                 city = 'Unincorporated'
 
-            elif city not in ['Boulder', 'Longmont', 'Superior', 'Lafayette', 'Louisville', 'Unincorporated']:
-                print('Please input a valid city or use format (ex: Boulder, Longmont)')
+            elif city is 'Erie':
+                city = 'Erie'
+
+            elif city not in ['Boulder', 'Longmont', 'Superior', 'Lafayette', 'Louisville', 'Unincorporated', 'Erie']:
+                print('Please choose a municipality from this list: '
+                      'Boulder, Longmont, Superior, Lafayette, Louisville, Unincorporated, Erie')
                 continue
 
         except TypeError:
@@ -75,26 +79,29 @@ def municipal_chooser():
 
 
 def spreadsheet_formatter(df):
-    if 'Parcel Number' in df.columns:
-        df['Parcel Number'] = df['Parcel Number'].astype(str)
+    df.columns = df.columns.str.strip()
+    df = df.replace({r'\r': ''}, regex=True)
     if 'PIN' in df.columns:
         df = df.rename(columns={'PIN': 'Parcel Number'})  # else if named pin, rename it
-
     if 'Parcel #\r' in df.columns:
         df = df.rename(columns={'Parcel #\r': 'Parcel Number'})
         df['Parcel Number'] = df['Parcel Number'].str.split('\r').str[0].astype(str).str.lstrip('0')
-
+    if 'Parcel #' in df.columns:
+        df = df.rename(columns={'Parcel #': 'Parcel Number'})
     if 'Parcel' in df.columns:
         df = df.rename(columns={'Parcel': 'Parcel Number'})
+    if 'Parcel Number' in df.columns:
+        df['Parcel Number'] = df['Parcel Number'].astype(str)
 
     if 'OriginalAddress' in df.columns:
         df = df.rename(columns={'OriginalAddress': 'Address'})
-
     if 'Address / Legal' in df.columns:
         df = df.rename(columns={'Address / Legal': 'Address'})
-
     if 'BuildingAd' in df.columns:
         df = df.rename(columns={'BuildingAd': 'Address'})
+    if {'Full Address', 'Address'}.issubset(df.columns):
+        df.drop(columns=['Address'], inplace=True)
+        df = df.rename(columns={'Full Address': 'Address'})
 
     if 'StatusCurrent' in df.columns:
         df = df.rename(columns={'StatusCurrent': 'Status'})
@@ -114,12 +121,14 @@ def spreadsheet_formatter(df):
 
     if 'Issued_Dat' in df.columns:
         df = df.rename(columns={'Issued_Dat': 'Issued Date'})
-    elif 'IssuedDate' in df.columns:
+    if 'IssuedDate' in df.columns:
         df = df.rename(columns={'IssuedDate': 'Issued Date'})
-    elif 'Permit Issued Date' in df.columns:
+    if 'Issue Date' in df.columns:
+        df = df.rename(columns={'Issue Date': 'Issued Date'})
+    if 'Permit Issued Date' in df.columns:
         df = df.rename(columns={'Permit Issued Date': 'Issued Date'})
-    # elif 'Issued_Date' or 'IssuedDate' in ~df.columns:
-    #     df['Issued Date'] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
+    if 'Date Issued' in df.columns:
+        df = df.rename(columns={'Date Issued': 'Issued Date'})
 
     if 'FinaledDat' in df.columns:
         df = df.rename(columns={'FinaledDat': 'Final Date'})
@@ -130,6 +139,8 @@ def spreadsheet_formatter(df):
         df = df.rename(columns={'Project Number': 'Permit Number'})
     if 'Permit' in df.columns:
         df = df.rename(columns={'Permit': 'Permit Number'})
+    if 'Permit #' in df.columns:
+        df = df.rename(columns={'Permit #': 'Permit Number'})
 
     if 'MasterPermitNum' in df.columns:
         df = df.rename(columns={'MasterPermitNum': 'Parent Permit Number'})
@@ -152,6 +163,13 @@ def spreadsheet_formatter(df):
         df['Description'].replace(regex=True, inplace=True, to_replace=r'\n', value=r'')
         df['Description'].replace(regex=True, inplace=True, to_replace=r'\r', value=r'')
         df['Description'].replace(regex=True, inplace=True, to_replace=r'\"', value=r'')
+    if 'Type of Permit' in df.columns:
+        df = df.rename(columns={'Type of Permit': 'Description'})
+        # removes *, ", and carriage returns
+        df['Description'].replace(regex=True, inplace=True, to_replace=r'\*', value=r'')
+        df['Description'].replace(regex=True, inplace=True, to_replace=r'\n', value=r'')
+        df['Description'].replace(regex=True, inplace=True, to_replace=r'\r', value=r'')
+        df['Description'].replace(regex=True, inplace=True, to_replace=r'\"', value=r'')
 
     if 'OBJECTID' in df.columns:
         df.drop(columns=['OBJECTID'], inplace=True)
@@ -165,6 +183,9 @@ def spreadsheet_formatter(df):
     elif 'Valuation' in df.columns:
         df = df.rename(columns={'Valuation': 'Value Total'})
         df['Value Total'] = df['Value Total'].fillna(0).astype('int')
+    elif 'EstProjectCost' in df.columns:
+        df = df.rename(columns={'EstProjectCost': 'Value Total'})
+        df['Value Total'] = df['Value Total'].fillna(0).astype('int')
     elif 'Value Total' in df.columns:
         pass
 
@@ -173,7 +194,7 @@ def spreadsheet_formatter(df):
 
 
 def superior_spreadsheet_formatter(df):
-
+    df.columns = df.columns.str.strip()
     df['Issued Date'] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
 
     df['Permit Number'] = pd.DataFrame(df.iloc[:, 1])
@@ -215,6 +236,7 @@ def superior_spreadsheet_formatter(df):
 def louisville_spreadsheet_formatter(df):
     df.columns = ["Permit Number", "Permit Code", "Work Class", "Parcel Number", 'Address', 'Issued Date',
                   'Value Total', 'Contractor']
+    df.columns = df.columns.str.strip()
     # using regex to do a negative lookbehind '?<=' to capture all text .* behind 'Description: ', '[]' is an either/or,
     # need to group the lookbehind and the capture all text in ()
     df['Description'] = df['Permit Number'].str.extract('((?<=[dD]escription: ).*)')
@@ -230,8 +252,16 @@ def louisville_spreadsheet_formatter(df):
     # Group on the first mask with cumsum and put that current value on all records, then use the second mask with where
     df = df.assign(Description=df.groupby(mask[::-1].cumsum())['Description'].transform(lambda x: x.iloc[-1]).where(fmask))
     df = df.dropna(subset=['Permit Number', 'Issued Date'])
-    #df = df.dropna(subset=['Issued Date'])
     df = df.drop(['Contractor', 'Permit Code'], axis=1)
+    return df
+
+
+def erie_spreadsheet_formatter(df):
+    df.columns = df.columns.str.strip()
+    df['Address_final'] = df['Address'].str.extract(r'(.*(?=ERIE|Erie))')
+    df = df.drop(['Address'], axis=1)
+    df.rename(columns={'Address_final': 'Address'}, inplace=True)
+
     return df
 
 
@@ -280,7 +310,6 @@ def permit_classifier(df):
         df.loc[(df['Work Class'].str.contains('Combo', na=False)) & (
             df['Description'].str.contains('doors', case=False, na=False)), 'SCOPE'] = 'W/D'
         df.loc[(df['Work Class'].str.contains('Remodel', case=False, na=False)), 'SCOPE'] = 'REM'
-        df.loc[df['Description'].str.contains('PV', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Description'].str.contains('photovoltaic', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Description'].str.contains('geotherm', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Description'].str.contains('flush-mounted', case=False, na=False), 'SCOPE'] = 'ENR'
@@ -436,7 +465,6 @@ def permit_classifier(df):
         df.loc[df['Description'].str.contains('solar', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Description'].str.contains('photo', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Description'].str.contains('P.V.', case=False, na=False), 'SCOPE'] = 'ENR'
-        df.loc[df['Description'].str.contains('photovoltaic', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Description'].str.contains('geotherm', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Description'].str.contains('flush-mounted', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Work Class'].str.contains('PV', na=False), 'SCOPE'] = 'ENR'
@@ -505,9 +533,6 @@ def unincorp_permit_classifier(df):
         df.loc[df['Description'].str.contains('doors', case=False, na=False), 'SCOPE'] = 'W/D'
         df.loc[df['Description'].str.contains('Remodel', case=False, na=False), 'SCOPE'] = 'REM'
         df.loc[df['Description'].str.contains('PV', case=False, na=False), 'SCOPE'] = 'ENR'
-        df.loc[df['Description'].str.contains('solar', case=False, na=False), 'SCOPE'] = 'ENR'
-        df.loc[df['Description'].str.contains('photo', case=False, na=False), 'SCOPE'] = 'ENR'
-        df.loc[df['Description'].str.contains('photovoltaic', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Description'].str.contains('geotherm', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Description'].str.contains('flush-mounted', case=False, na=False), 'SCOPE'] = 'ENR'
         df.loc[df['Description'].str.contains('wood fireplace', case=False, na=False), 'SCOPE'] = 'WFP'
@@ -532,6 +557,7 @@ def unincorp_permit_classifier(df):
         df.loc[(df['Description'].str.contains('Remodel', case=False, na=False)) & (
                 df['Description'].str.contains('fire', case=False, na=False)), 'SCOPE'] = 'FRP'
         df.loc[df['Description'].str.contains('gas fireplace', case=False, na=False), 'SCOPE'] = 'GFP'
+        df.loc[df['Description'].str.contains('gas log', case=False, na=False), 'SCOPE'] = 'GFP'
         df.loc[df['Description'].str.contains('Elevator', case=False, na=False), 'SCOPE'] = 'ELE'
         df.loc[df['Description'].str.contains('Siding', na=False), 'SCOPE'] = 'SDG'
         df.loc[(df['Description'].str.contains('Right', na=False)) & (
@@ -756,7 +782,7 @@ def address_and_parcel_merge(df):
             df_merge_perm['strap_x'].notnull(), df_merge_perm['strap_y'])
         df_merge_perm.drop_duplicates(subset=['Permit Number'], keep='last', inplace=True)
 
-    elif city in ['Boulder', 'Superior', 'Louisville']:
+    elif city in ['Boulder', 'Superior', 'Louisville', 'Erie']:
         df = df.merge(city_address, on='Address', how='left')
         df.drop(columns=['Parcel Number_y'])
         df = df.rename(columns={'Parcel Number_x': 'Parcel Number'})
@@ -819,21 +845,22 @@ def final_cleanup_and_export(df):
     df.rename(columns={'str_y': 'str'}, inplace=True)
     df.rename(columns={'str_sfx_y': 'str_sfx'}, inplace=True)
     df.rename(columns={'str_unit_y': 'str_unit'}, inplace=True)
+    df = df.fillna(' ')
     # create spreadsheet for app.
     print("Please name the exported spreadsheet for the Appraiser staff")
     if city == 'Longmont':
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
              "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SQFT", "SCOPE",
-             "nh_cd", "dor_cd", "map_id"]]
+             "nh_cd", "dor_cd"]]
     elif city == 'Boulder':
         df = df[["Permit Number", "Parent Permit Number", "strap", "Description", "str_num", "str_pfx",
-                 "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE",
-                 "nh_cd", "dor_cd", "map_id"]]
+                 "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Finaled Date", "Work Class", "SCOPE",
+                 "nh_cd", "dor_cd"]]
     elif city == 'Superior':
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
                  "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE",
                  "nh_cd", "dor_cd", "map_id"]]
-    elif city in ['Lafayette', 'Louisville', 'Unincorporated']:
+    elif city in ['Lafayette', 'Louisville', 'Unincorporated', 'Erie']:
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
                  "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE",
                  "nh_cd", "dor_cd", "map_id"]]
@@ -845,13 +872,13 @@ def final_cleanup_and_export(df):
 
     elif city == 'Boulder':
         df = df[["Permit Number", "Parent Permit Number", "strap", "Description", "str_num", "str_pfx",
-                 "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE"]]
+                 "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Finaled Date", "Work Class", "SCOPE"]]
 
     elif city == 'Superior':
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE"]]
 
-    elif city in ['Lafayette', 'Louisville', 'Unincorporated']:
+    elif city in ['Lafayette', 'Louisville', 'Unincorporated', 'Erie']:
         df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
             "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]]
 
@@ -862,26 +889,28 @@ def final_cleanup_and_export(df):
     header = header[:-1]  # to take the final | off, as it's unnecessary
     # take the values of each column and add double quotes
     if city == 'Longmont':
-        df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
-            "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SQFT", "SCOPE"]]
+        df.update(df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
+            "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SQFT", "SCOPE"]].applymap('"{}"'.format))
 
     elif city in ['Superior']:
-        df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
-            "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE"]]
+        df.update(df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
+            "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE"]].applymap('"{}"'.format))
 
     elif city in ['Boulder']:
-        df = df[["Permit Number", "Parent Permit Number", "strap", "Description", "str_num", "str_pfx",
-                 "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Final Date", "SCOPE"]]
+        df.update(df[["Permit Number", "Parent Permit Number", "strap", "Description", "str_num", "str_pfx",
+                 "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "Finaled Date", "Work Class",
+                      "SCOPE"]].applymap('"{}"'.format))
 
-    elif city in ['Lafayette', 'Louisville', 'Unincorporated']:
-        df = df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
-            "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]]
+    elif city in ['Lafayette', 'Louisville', 'Unincorporated', 'Erie']:
+        df.update(df[["Permit Number", "strap", "Description", "str_num", "str_pfx",
+            "str", "str_sfx", "str_unit", "Value Total", "Issued Date", "SCOPE"]].applymap('"{}"'.format))
 
     # now, save to a text file with a | separator
     print("Please name the txt file that will be uploaded to CAMA")
     np.savetxt(input() + city +'_permits.txt', df.values, fmt='%s', header=header, comments='', delimiter='|')
 
     return df
+
 
 # Run the file opener function
 df = file_opener()
@@ -893,8 +922,11 @@ city = municipal_chooser()
 # styles to format
 if city == 'Superior':
     df = superior_spreadsheet_formatter(df)
-if city == 'Louisville':
+elif city == 'Louisville':
     df = louisville_spreadsheet_formatter(df)
+elif city == 'Erie':
+    df = spreadsheet_formatter(df)
+    df = erie_spreadsheet_formatter(df)
 elif city in ['Boulder', 'Longmont', 'Lafayette', 'Unincorporated']:
     df = spreadsheet_formatter(df)
 
@@ -902,7 +934,7 @@ elif city in ['Boulder', 'Longmont', 'Lafayette', 'Unincorporated']:
 df = issued_date_filter(df)
 
 # Classify the permits using the three letter scope code
-if city == 'Unincorporated':
+if city in ['Unincorporated', 'Erie']:
     df = unincorp_permit_classifier(df)
 else:
     df = permit_classifier(df)

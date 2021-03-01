@@ -27,7 +27,7 @@ def file_opener():
             print("Potentially corrupt dbf file, please attempt to export via ArcMap")
     elif filename.endswith('.csv'):
         try:
-            df = pd.read_csv(filename, sep=",", error_bad_lines=False, index_col=False, encoding='ISO-8859-1',
+            df = pd.read_csv(filename, sep=",", error_bad_lines=False, index_col=False, encoding="utf-8",
                             lineterminator='\n', low_memory=False)
         except:
             print('Potentially corrupt csv file, please open in Excel to check')
@@ -80,7 +80,9 @@ def municipal_chooser():
 
 def spreadsheet_formatter(df):
     df.columns = df.columns.str.strip()
+    cleanup = df.columns
     df = df.replace({r'\r': ''}, regex=True)
+    df[cleanup] = df[cleanup].replace('[\$,]', '', regex = True)
     if 'PIN' in df.columns:
         df = df.rename(columns={'PIN': 'Parcel Number'})  # else if named pin, rename it
     if 'Parcel #\r' in df.columns:
@@ -181,16 +183,16 @@ def spreadsheet_formatter(df):
     if 'jobValue' in df.columns:
         df = df.rename(columns={'jobValue': 'Value Total'})
         df['Value Total'] = df['Value Total'].astype('int')
-    elif 'Construction Value' in df.columns:
+    if 'Construction Value' in df.columns:
         df = df.rename(columns={'Construction Value': 'Value Total'})
         df['Value Total'] = df['Value Total'].astype('int')
-    elif 'Valuation' in df.columns:
+    if 'Valuation' in df.columns:
         df = df.rename(columns={'Valuation': 'Value Total'})
         df['Value Total'] = df['Value Total'].fillna(0).astype('int')
-    elif 'EstProjectCost' in df.columns:
+    if 'EstProjectCost' in df.columns:
         df = df.rename(columns={'EstProjectCost': 'Value Total'})
-        df['Value Total'] = df['Value Total'].fillna(0).astype('int')
-    elif 'Value Total' in df.columns:
+        df['Value Total'] = df['Value Total'].astype('float').fillna(0).astype('int')
+    if 'Value Total' in df.columns:
         pass
 
     df.dropna(subset=['Issued Date'], how='all', inplace=True)
@@ -730,12 +732,12 @@ def unincorp_permit_classifier(df):
         df.loc[(df['Description'].str.contains('Residential', case=False, na=False) &
                 df['Description'].str.contains('Apartment', case=False, na=False)), 'SCOPE'] = 'NEW'
         df.loc[df['Description'].str.contains('BWOP', case=False, na=False), 'SCOPE'] = 'NEW'
-        df.loc[df['Description'].str.contains('(SPR', case=False, na=False), 'SCOPE'] = 'NEW'
-        df.loc[df['Description'].str.contains('(LE', case=False, na=False), 'SCOPE'] = 'NEW'
+        df.loc[df['Description'].str.contains('(SPR', case=False, na=False, regex=False), 'SCOPE'] = 'NEW'
+        df.loc[df['Description'].str.contains('(LE', case=False, na=False, regex=False), 'SCOPE'] = 'NEW'
         df.loc[df['Description'].str.contains('carport', case=False, na=False) & (
             df['Value Total'] > 10000), 'SCOPE'] = 'NEW'
         df.loc[df['Description'].str.contains('garage', case=False, na=False) & (
-            df['Description'].str.contains('(SPR', case=False, na=False)), 'SCOPE'] = 'GAR'
+            df['Description'].str.contains("(SPR", case=False, na=False, regex=False)), 'SCOPE'] = 'GAR'
         df.loc[df['Description'].str.contains('Barn', case=False, na=False) & (
             df['Description'].str.contains('BWOP', case=False, na=False)), 'SCOPE'] = 'BRN'
         df.loc[df['Description'].str.contains('Structural', case=False, na=False) & (
@@ -756,15 +758,28 @@ def unincorp_permit_classifier(df):
     return df
 
 
-def database_connection(df):
+def database_connection():
     print('Establishing connection...\n')
-    c_str = open('connection_string.txt', 'r').read()  # can be removed once connection string is added
-    cnxn = pyodbc.connect(c_str)
+    while True:
+        try:
+            c_str = open('connection_string.txt', 'r').read()  # can be removed once connection string is added
+            cnxn = pyodbc.connect(c_str)
+            return cnxn
 
+        except pyodbc.InterfaceError:
+            print('Invalid password, please input new password:')
+            password = input()
+            cnxn = pyodbc.connect(driver="{SQL Server}",SERVER="server", DSN="prod", UID="db",
+                                  PWD=password)
+            print('Connected to the CAMA database')
+            return cnxn
+
+
+def permit_check_and_address_creation(df, cnxn):
     if city == 'Unincorporated':
         city_sql = """SELECT distinct parcel.strap, strap_idx.folio, parcel.status_cd, parcel.dor_cd, parcel.nh_cd, 
                 parcel.map_id, site.str_num, site.str_pfx, site.str, site.str_sfx, site.str_sfx_dir, site.str_unit
-        	    FROM r_prod.dbo.parcel
+                FROM r_prod.dbo.parcel
                 INNER JOIN r_prod.dbo.site ON parcel.strap = site.strap
                 INNER JOIN r_prod.dbo.strap_idx ON parcel.strap = strap_idx.strap
                 WHERE (parcel.dor_cd <> 'POSS') AND parcel.status_cd = 'A'
@@ -773,7 +788,7 @@ def database_connection(df):
     else:
         city_sql = """SELECT distinct parcel.strap, strap_idx.folio, parcel.status_cd, parcel.dor_cd, parcel.nh_cd, 
         parcel.map_id, site.str_num, site.str_pfx, site.str, site.str_sfx, site.str_sfx_dir, site.str_unit
-	    FROM r_prod.dbo.parcel
+        FROM r_prod.dbo.parcel
         INNER JOIN r_prod.dbo.site ON parcel.strap = site.strap
         INNER JOIN r_prod.dbo.strap_idx ON parcel.strap = strap_idx.strap
         WHERE (parcel.dor_cd <> 'POSS') AND parcel.status_cd = 'A'
@@ -913,7 +928,7 @@ def final_cleanup_and_export(df):
     df.rename(columns={'str_x': 'str'}, inplace=True)
     df.rename(columns={'str_sfx_x': 'str_sfx'}, inplace=True)
     df.rename(columns={'str_unit_x': 'str_unit'}, inplace=True)
-    df = df.fillna(' ')
+    df = df.fillna('')
     # create spreadsheet for app.
     print("Please name the exported spreadsheet for the Appraiser staff")
     if city == 'Longmont':
@@ -1007,7 +1022,8 @@ else:
     df = permit_classifier(df)
 
 # Create a permit dataframe and an address dataframe
-permit, city_address = database_connection(df)
+cnxn = database_connection()
+permit, city_address = permit_check_and_address_creation(df, cnxn)
 
 # Merge the queried building permits with the ones already uploaded in CAMA
 df_uploaded = pd.merge(df, permit, on='Permit Number')

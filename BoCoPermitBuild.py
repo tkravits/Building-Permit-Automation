@@ -8,7 +8,11 @@ from pandas import DataFrame
 
 
 def file_opener():
-    # imports the permit sheet to be cleaned up
+    """
+    Tkinter opens up and based on whether it's a csv, xlsx, or a dbf takes that file and converts it
+    to a pandas dataframe
+    :return:
+    """
     print('Opening file window...\n')
     Tk().withdraw()  # this prevents root tkinter window from appearing
     # this opens a window to choose out excel sheet
@@ -41,6 +45,11 @@ def file_opener():
 
 
 def municipal_chooser():
+    """
+    This returns a variable called city based on the input from the user. The city is used to pull addresses
+    and specific spreadsheet formatting
+    :return:
+    """
     while True:
         print('Please input the municipality whose permits you would like to upload')
         city = input('Municipality: ')
@@ -79,6 +88,14 @@ def municipal_chooser():
 
 
 def spreadsheet_formatter(df):
+    """
+    This is the general spreadsheet formatter, it takes in a dataframe and attemps to "clean" it, this
+    is based on a lot of assumptions as far as naming goes in the header and exports it to
+    a consistent format. It also looks for new lines, *, and double quotes in the description column
+    which can cause a failure to import into CAMA
+    :param df:
+    :return:
+    """
     df.columns = df.columns.str.strip()
     cleanup = df.columns
     df = df.replace({r'\r': ''}, regex=True)
@@ -200,6 +217,12 @@ def spreadsheet_formatter(df):
 
 
 def superior_spreadsheet_formatter(df):
+    """
+    The city of Superior enters their spreadsheet by hand, so this assumes that the columns are in the same
+    position every time and checks for spelling errors
+    :param df:
+    :return:
+    """
     df.columns = df.columns.str.strip()
     df['Issued Date'] = pd.to_datetime(df.iloc[:, 0], errors='coerce')
 
@@ -230,18 +253,37 @@ def superior_spreadsheet_formatter(df):
     df['Address'] = df['Address'].str.replace('HEARTSTONG', 'HEARTSTRONG', regex=True)
     df['Address'] = df['Address'].str.replace('GOLDENEY', 'GOLDENEYE', regex=True)
     df['Address'] = df['Address'].str.replace('TORREYS PK', 'TORREYS PEAK', regex=True)
+    df['Address'] = df['Address'].str.replace('CASLTE', 'CASTLE', regex=True)
+    df['Address'] = df['Address'].str.replace('FIRST', '1ST', regex=True)
+    df['Address'] = df['Address'].str.replace('SECOND', '2ND', regex=True)
+    df['Address'] = df['Address'].str.replace('THIRD', '3RD', regex=True)
+    df['Address'] = df['Address'].str.replace('FOURTH', '4TH', regex=True)
+    df['Address'] = df['Address'].str.replace('FIFTH', '5TH', regex=True)
+    df['Address'] = df['Address'].str.replace('SIXTH', '6TH', regex=True)
+    df['Address'] = df['Address'].str.replace('SEVENTH', '7TH', regex=True)
+    df['Address'] = df['Address'].str.replace('EIGHTH', '8TH', regex=True)
+    df['Address'] = df['Address'].str.replace('WAY', 'WY', regex=True)
 
     # drop any rows that did not convert to a datetime
     df.dropna(subset=['Issued Date'], how='all', inplace=True)
     df['Value Total'] = df['Value Total'].astype(int)
     df['Permit Number'] = df['Permit Number'].astype(str)
-    df['Parcel Number'] = df['Parcel Number'].astype(str)
+    df = df[['Issued Date', 'Permit Number', 'Address', 'Description', 'Value Total']]
+    if 'Parcel Number' in df.columns:
+        df['Parcel Number'] = df['Parcel Number'].astype(str)
+        df = df[['Issued Date', 'Permit Number', 'Address', 'Description', 'Value Total', 'Parcel Number']]
     # cleans up the dataframe
     df = df[['Issued Date', 'Permit Number', 'Address', 'Description', 'Value Total']]
     return df
 
 
 def louisville_spreadsheet_formatter(df):
+    """
+    Louisville is normally a PDF that is converted using Able2Extract into a spreadsheet. This takes
+    that result and extracts the description which is misaligned and puts it into its own column
+    :param df:
+    :return:
+    """
     df.columns = ["Permit Number", "Permit Code", "Work Class", "Parcel Number", 'Address', 'Issued Date',
                   'Value Total', 'Contractor']
     df.columns = df.columns.str.strip()
@@ -273,6 +315,12 @@ def louisville_spreadsheet_formatter(df):
 
 
 def erie_spreadsheet_formatter(df):
+    """
+    Erie puts its address into one line so I use regex to extract the city part (ex: Erie, CO 800xx) out
+    so that the address can be matched up
+    :param df:
+    :return:
+    """
     df.columns = df.columns.str.strip()
     df['Address_final'] = df['Address'].str.extract(r'(.*(?=ERIE|Erie))')
     df = df.drop(['Address'], axis=1)
@@ -284,6 +332,12 @@ def erie_spreadsheet_formatter(df):
 
 
 def issued_date_filter(df):
+    '''
+    The Issue date field is converted into a date field if not already and allows the user to filter
+    based on the dates they input
+    :param df:
+    :return:
+    '''
     while True:
         # create an input to select the earliest date the user wants to upload
         print('Please input the earliest date you would like (ex: 09/26/2020)')
@@ -301,6 +355,13 @@ def issued_date_filter(df):
 
 
 def permit_classifier(df):
+    '''
+    This looks in the description and Work Class column and creates a new column called Scope and fills
+    in a three letter code based on what the permit description is. CAMA uses scope to classify permits
+    and this automates the process
+    :param df:
+    :return:
+    '''
     if 'Description' in df.columns:
         # Classifies the description into a format that CAMA can understand
         df.loc[df['Description'].str.contains('valve', case=False, na=False), 'SCOPE'] = 'OTH'
@@ -535,6 +596,13 @@ def permit_classifier(df):
 
 
 def unincorp_permit_classifier(df):
+    '''
+    Takes only the description column since Work Class is not found in all municipalities. This creates and fills
+    in a column called SCOPE based on the permit description and classifies using a pre-determined three
+    letter code
+    :param df:
+    :return:
+    '''
     if 'Description' in df.columns:
         # Classifies the description into a format that CAMA can understand
         df.loc[df['Description'].str.contains('valve', case=False, na=False), 'SCOPE'] = 'OTH'
@@ -759,6 +827,11 @@ def unincorp_permit_classifier(df):
 
 
 def database_connection():
+    '''
+    Connects to the County's SQL server database and returns two dataframes that contain every permit in
+    the database, and every property address for the city that was input previously
+    :return:
+    '''
     print('Establishing connection...\n')
     while True:
         try:
@@ -769,13 +842,21 @@ def database_connection():
         except pyodbc.InterfaceError:
             print('Invalid password, please input new password:')
             password = input()
-            cnxn = pyodbc.connect(driver="{SQL Server}",SERVER="server", DSN="prod", UID="db",
+            cnxn = pyodbc.connect(driver="{SQL Server}",SERVER="server", DSN="r_prod", UID="db",
                                   PWD=password)
             print('Connected to the CAMA database')
             return cnxn
 
 
 def permit_check_and_address_creation(df, cnxn):
+    '''
+    Checks to see if the permit is already in our database and if so, removes it. This is done to make sure
+    we aren't double-uploading permits. This also creates an address dataframe so that later on it can be
+    merged with the initial building permit dataframe successfully
+    :param df:
+    :param cnxn:
+    :return:
+    '''
     if city == 'Unincorporated':
         city_sql = """SELECT distinct parcel.strap, strap_idx.folio, parcel.status_cd, parcel.dor_cd, parcel.nh_cd, 
                 parcel.map_id, site.str_num, site.str_pfx, site.str, site.str_sfx, site.str_sfx_dir, site.str_unit
@@ -811,8 +892,14 @@ def permit_check_and_address_creation(df, cnxn):
 
 
 def address_formatter(df):
-    # attempting to take our situs address, concat, and compare with the city's permit address
-    # (only using active accts, no possessory interest)
+    """
+    Formats the address in the creates CAMA address dataframe that is pulled from database_connection()
+    fucntion. Attempting to take our situs address, concat, and compare with the city's permit address
+    (only using active accts, no possessory interest)
+    :param df:
+    :return:
+    """
+
     df.dropna(subset=['str_num'])
     df['str_num'] = df['str_num'].astype(int).astype(str)
     df['str_pfx'] = df['str_pfx'].fillna(np.nan).replace(np.nan, ' ', regex=True)
@@ -837,6 +924,13 @@ def address_formatter(df):
 
 
 def address_and_parcel_merge(df):
+    """
+    Takes the selected city and merges the two dataframes (initial dataframe and the County's address
+    dataframe). If successful, continue on, if the merge doesn't occur, use the parcel number provided,
+    if that doesn't work, dump it into a spreadsheet to be looked at by hand
+    :param df:
+    :return:
+    """
     if city == 'Longmont':
         # merges the CAMA accounts database (strap) with the created Address field with the city's permit spreadsheet
         df['Address'] = df['Address'].str.replace(' UNIT ', ' ')
@@ -912,6 +1006,13 @@ def address_and_parcel_merge(df):
 
 
 def final_cleanup_and_export(df):
+    """
+    Converts the dataframe into a txt file that will be uploaded to our CAMA database. The County's current
+    system needs a .txt file in a specific format, so this function makes sure that the output is consistent.
+    This also outputs a spreadsheet for the appraisal staff to look at
+    :param df:
+    :return:
+    """
     df['strap'] = df['strap_final'].str.rstrip()
     df['str_num_x'] = df['str_num_x'].where(df['str_num_x'].notnull(), df['str_num_y'])
     df['str_pfx_x'] = df['str_pfx_x'].where(df['str_pfx_x'].notnull(), df['str_pfx_y'])
@@ -1032,8 +1133,11 @@ df_uploaded = pd.merge(df, permit, on='Permit Number')
 df = df.loc[~df['Permit Number'].isin(df_uploaded['Permit Number'])]
 df.drop_duplicates()
 
+# Formats the address
 city_address = address_formatter(city_address)
 
+# Merges based on address, if nothing, merge on parcel, if nothing then output to spreadsheet
 df, df_merge_perm, df_unmerged_addresses = address_and_parcel_merge(df)
 
+# Converts the dataframe into a .txt file
 final_cleanup_and_export(df_merge_perm)
